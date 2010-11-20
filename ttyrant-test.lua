@@ -72,6 +72,18 @@ assert(vsnt.saint7 == 'Ilie Lăcătuşu')
 assert(th:out('Key1'))
 assert(not th:get('Key1'))
 
+-- ttyrant:out() - multiple keys at once given as table
+assert(th:out{ 'saint1', 'saint4', 'martyr6' })
+assert(not th:get('saint1'))
+assert(not th:get('saint4'))
+assert(not th:get('martyr6'))
+
+-- ttyrant:out() - multiple keys at once given as list
+assert(th:out('martyr1', 'martyr4', 'saint6'))
+assert(not th:get('martyr1'))
+assert(not th:get('martyr4'))
+assert(not th:get('saint6'))
+
 -- ttyrant:add()
 assert(th:add('Key1',  3) == 3)
 assert(th:add('Key1',  3) == 6)
@@ -132,4 +144,4 @@ assert(qr:delete())
 --
 -- Success.
 --
-print('All tests completed.')
+print('All tests completed successfully.')

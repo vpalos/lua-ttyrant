@@ -1,11 +1,8 @@
 #
 # Compilation flags.
 #
-CFLAGS      = -O2
-LFLAGS      = -ltokyotyrant
-LUA         = 'lua5.1'
-LUA_CFLAGS  = $(shell pkg-config $(LUA) --cflags)
-LUA_LFLAGS  = $(shell pkg-config $(LUA) --libs)
+CFLAGS = -O2 -fPIC -shared
+LFLAGS = -ltokyotyrant $(shell pkg-config 'lua5.1' --cflags --libs)
 
 #
 # Targets.
@@ -19,9 +16,8 @@ test: build
 
 clean:
 	rm -rf *.so
-	rm -rf *.o
 
 ttyrant.so: ttyrant.c
 	@ echo -n "ttyrant.so... "
-	@ $(CC) $(CFLAGS) $(LUA_CFLAGS) $(LFLAGS) $(LUA_LFLAGS) -fPIC -shared -o ttyrant.so ttyrant.c
+	@ $(CC) $(CFLAGS) $(LFLAGS) -o $@ ttyrant.c
 	@ echo "OK"

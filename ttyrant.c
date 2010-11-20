@@ -270,42 +270,43 @@ static int luaF_ttyrant_add(lua_State* L) {
 static int luaF_ttyrant_put(lua_State* L) {
 
     // initialize
-    TCRDB* db = _self_rdb(L);
+    TCRDB*  db = _self_rdb(L);
     TCLIST* items = NULL;
-    TCLIST* result = NULL;
+    int     status = 0;
 
     // table
     if (lua_istable(L, 2)) {
         items = _luatable2tclist(L, 2, 1);
-        result = tcrdbmisc(db, "putlist", 0, items);
-        if (!result) {
-            _failure(L, tcrdberrmsg(tcrdbecode(db)));
-        }
 
     // item
     } else if (lua_gettop(L) == 3) {
-        size_t keysz, valsz;
+        size_t keysz, valuesz;
         const char* key = luaL_checklstring(L, 2, &keysz);
-        const char* val = luaL_checklstring(L, 3, &valsz);
-        if (!tcrdbput(db, key, keysz, val, valsz)) {
-            _failure(L, tcrdberrmsg(tcrdbecode(db)));
-        }
+        const char* value = luaL_checklstring(L, 3, &valuesz);
+        status = tcrdbput(db, key, keysz, value, valuesz);
 
     // list
     } else {
         items = _lualist2tclist(L, 2);
-        result = tcrdbmisc(db, "putlist", 0, items);
-        if (!result) {
-            _failure(L, tcrdberrmsg(tcrdbecode(db)));
-        }
     }
 
-    // finish
+    // clear items
     if (items) {
+        TCLIST* result = tcrdbmisc(db, "putlist", 0, items);
+        if (result) {
+            status = 1;
+            tclistdel(result);
+        }
         tclistdel(items);
-        tclistdel(result);
+    }
+
+    // result
+    if (!status) {
+        _failure(L, tcrdberrmsg(tcrdbecode(db)));
     }
     lua_pushboolean(L, 1);
+
+    // ready
     return 1;
 }
 
@@ -318,46 +319,41 @@ static int luaF_ttyrant_put(lua_State* L) {
 static int luaF_ttyrant_get(lua_State* L) {
 
     // initialize
-    TCRDB* db = _self_rdb(L);
+    TCRDB*  db = _self_rdb(L);
     TCLIST* keys = NULL;
     TCLIST* items = NULL;
+    char*   item = NULL;
+    int     itemsz = 0;
 
-    // keys table
+    // input set
     if (lua_istable(L, 2)) {
         keys = _luatable2tclist(L, 2, 0);
-        items = tcrdbmisc(db, "getlist", 0, keys);
-        if (!items) {
-            _failure(L, tcrdberrmsg(tcrdbecode(db)));
-        }
-        _tclist2luatable(L, items, 1);
-
-    // single key
     } else if (lua_gettop(L) == 2) {
         size_t keysz;
-        int valsz;
         const char* key = luaL_checklstring(L, 2, &keysz);
-        char* val = tcrdbget(db, key, keysz, &valsz);
-        if (!val) {
-            _failure(L, tcrdberrmsg(tcrdbecode(db)));
-        }
-        lua_pushlstring(L, val, valsz);
-        free(val);
-
-    // keys list
+        item = tcrdbget(db, key, keysz, &itemsz);
     } else {
         keys = _lualist2tclist(L, 2);
+    }
+
+    // act on set
+    if (keys) {
         items = tcrdbmisc(db, "getlist", 0, keys);
-        if (!items) {
-            _failure(L, tcrdberrmsg(tcrdbecode(db)));
-        }
+        tclistdel(keys);
+    }
+
+    // result set
+    if (item) {
+        lua_pushlstring(L, item, itemsz);
+        free(item);
+    } else if (items) {
         _tclist2luatable(L, items, 1);
+        tclistdel(items);
+    } else {
+        _failure(L, tcrdberrmsg(tcrdbecode(db)));
     }
 
     // done
-    if (items) {
-        tclistdel(keys);
-        tclistdel(items);
-    }
     return 1;
 }
 
@@ -365,37 +361,47 @@ static int luaF_ttyrant_get(lua_State* L) {
  * Erase key(s) from db.
  *
  * true|false = ttyrant:out(key1, key2, ...)
+ * true|false = ttyrant:out{key1, key2, ...}
  */
 static int luaF_ttyrant_out(lua_State* L) {
 
     // initialize
-    TCRDB* db = _self_rdb(L);
+    TCRDB*  db = _self_rdb(L);
     TCLIST* items = NULL;
-    TCLIST* result = NULL;
+    int     status = 0;
+
+    // table
+    if (lua_istable(L, 2)) {
+        items = _luatable2tclist(L, 2, 0);
 
     // item
-    if (lua_gettop(L) == 2) {
+    } else if (lua_gettop(L) == 2) {
         size_t keysz;
         const char* key = luaL_checklstring(L, 2, &keysz);
-        if (!tcrdbout(db, key, keysz)) {
-            _failure(L, tcrdberrmsg(tcrdbecode(db)));
-        }
+        status = tcrdbout(db, key, keysz);
 
     // list
     } else {
         items = _lualist2tclist(L, 2);
-        result = tcrdbmisc(db, "outlist", 0, items);
-        if (!result) {
-            _failure(L, tcrdberrmsg(tcrdbecode(db)));
-        }
     }
 
-    // finish
+    // clear items
     if (items) {
+        TCLIST* result = tcrdbmisc(db, "outlist", 0, items);
+        if (result) {
+            status = 1;
+            tclistdel(result);
+        }
         tclistdel(items);
-        tclistdel(result);
+    }
+
+    // result
+    if (!status) {
+        _failure(L, tcrdberrmsg(tcrdbecode(db)));
     }
     lua_pushboolean(L, 1);
+
+    // ready
     return 1;
 }
 

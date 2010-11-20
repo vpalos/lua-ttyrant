@@ -1,3 +1,42 @@
-A Lua binding to the TokyoTyrant (C) API.
-Copyright (C)2010 by Valeriu Palos. All rights reserved.
-This software is under BSD license http://creativecommons.org/licenses/BSD/.
+--- Project --------------------------------------------------------------------------------------------------
+
+    LUA-TTYRANT:
+    A Lua binding to the C API of the TokyoTyrant storage server.
+    Written by Valeriu Paloş (Copyright 2010).
+
+--- Description ----------------------------------------------------------------------------------------------
+
+Lua-ttyrant is a binding to the C API of the TokyoTyrant server (visit http://fallabs.com/) for the Lua
+programming language. I have seen several attempts on the net to build a TokyoTyrant library straight in Lua
+(implementing the protocol) but I feel that is error prone and rather unnatural since Lua is especially
+designed to work *with* C and not to avoid it. Further more, by using the actual TokyoTyrant C API library
+this implementation is far less likely to make protocol mistakes or to fall behind any upgrades made by
+Mikio Hirabayashi (the TokyoTyrant creator). It is also a bit faster :).
+
+--- License --------------------------------------------------------------------------------------------------
+
+    Copyright 2010 Valeriu Paloş. All rights reserved.
+
+    Redistribution and use in source and binary forms, with or without modification, are
+    permitted provided that the following conditions are met:
+
+       1. Redistributions of source code must retain the above copyright notice, this list of
+          conditions and the following disclaimer.
+
+       2. Redistributions in binary form must reproduce the above copyright notice, this list
+          of conditions and the following disclaimer in the documentation and/or other materials
+          provided with the distribution.
+
+    THIS SOFTWARE IS PROVIDED BY VALERIU PALOŞ ``AS IS'' AND ANY EXPRESS OR IMPLIED
+    WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
+    FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL VALERIU PALOŞ OR
+    CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+    CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+    SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+    ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+    NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+    ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+    The views and conclusions contained in the software and documentation are those of the
+    authors and should not be interpreted as representing official policies, either expressed
+    or implied, of Valeriu Paloş.

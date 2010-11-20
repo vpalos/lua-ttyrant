@@ -2,7 +2,7 @@
  * ttyrant.c: TokyoTyrant API binding for Lua.
  *
  * Copyright (C)2010 by Valeriu Palos. All rights reserved.
- * This software is under BSD license http://creativecommons.org/licenses/BSD/.
+ * This library is under the BSD license (see README file).
  */
 
 #include <lua.h>
@@ -23,7 +23,7 @@
 /*
  * Self-extraction macros.
  */
-#define _self_any(L, F, C)  _self(L, "__" #F, "Invalid «self» given, expected «" C "» instance!")
+#define _self_any(L, F, C)  _self(L, 1, "__" #F, "Invalid «self», expected «" C "» instance!")
 #define _self_rdb(L)        (TCRDB*)_self_any(L, rdb, "ttyrant")
 #define _self_tdb(L)        (TCRDB*)_self_any(L, tdb, "ttyrant.table")
 #define _self_qry(L)        (RDBQRY*)_self_any(L, qry, "ttyrant.query")
@@ -31,12 +31,12 @@
 /*
  * Extract 'self' userdata from '__xyz' field of first parameter.
  */
-static void* _self(lua_State* L, const char* __xyz, const char* error) {
+static void* _self(lua_State* L, int level, const char* __xyz, const char* error) {
 
     // extract
     void* self = NULL;
-    if (lua_istable(L, 1)) {
-        lua_getfield(L, 1, __xyz);
+    if (lua_istable(L, level)) {
+        lua_getfield(L, level, __xyz);
         self = lua_touserdata(L, -1);
         lua_pop(L, 1);
     }
@@ -73,10 +73,9 @@ static TCLIST* _lualist2tclist(lua_State* L, int index) {
 }
 
 /*
- * Turn a Lua table found at the 'index' position in the
- * given stack into a TCLIST object (key1, value1, key2...).
- * The keys parameters dictates wether keys are added to the
- * list or just values.
+ * Turn a Lua table found at the 'index' position in the given
+ * stack into a TCLIST object as key1, value1, key2... if keys
+ * is 1, or as value1, value2... if keys is 0.
  */
 static TCLIST* _luatable2tclist(lua_State* L, int index, int keys) {
 
@@ -102,6 +101,7 @@ static TCLIST* _luatable2tclist(lua_State* L, int index, int keys) {
                 if (skeysz < 0) {
                     break;
                 } else {
+                    key = skey;
                     keysz = skeysz;
                 }
             }
@@ -121,23 +121,29 @@ static TCLIST* _luatable2tclist(lua_State* L, int index, int keys) {
 /*
  * Assemble the items of the given TCLIST object into a Lua table
  * at the top of the given Lua stack. Elements are taken in order
- * from start to end, as key1, value1, key2 etc.
+ * from start to end as key1, value1, key2... if keys is 1, or as
+ * value1, value2... if keys is 0.
  */
-static int _tclist2luatable(lua_State* L, TCLIST* items) {
+static int _tclist2luatable(lua_State* L, TCLIST* items, int keys) {
 
     // initialize
     lua_newtable(L);
     int itemsz;
     char* item;
-    int pairs = tclistnum(items) / 2;
+    int pairs = tclistnum(items) / (keys ? 2 : 1);
+    int index = 1;
 
     // traverse
     for (; pairs > 0; pairs--) {
 
         // key
-        item = tclistshift(items, &itemsz);
-        lua_pushlstring(L, item, itemsz);
-        free(item);
+        if (keys) {
+            item = tclistshift(items, &itemsz);
+            lua_pushlstring(L, item, itemsz);
+            free(item);
+        } else {
+            lua_pushinteger(L, index++);
+        }
 
         // value
         item = tclistshift(items, &itemsz);
@@ -156,11 +162,11 @@ static int _tclist2luatable(lua_State* L, TCLIST* items) {
 /*
  * Open a database.
  */
-static int _new(lua_State* L, const char* class, const char* __xyz) {
+static int _open(lua_State* L, const char* class, const char* __xyz) {
 
     // instance
     if (!lua_istable(L, 1)) {
-        luaL_error(L, "Invalid «self» given, expected «%s»!", class);
+        luaL_error(L, "Invalid «self» given to %class:open(), expected «%s»!", class, class);
     } else if (lua_gettop(L) < 2) {
         lua_newtable(L);
     }
@@ -179,11 +185,11 @@ static int _new(lua_State* L, const char* class, const char* __xyz) {
     lua_pop(L, 2);
 
     // open db
-    TCRDB* rdb = tcrdbnew();
-    if (!tcrdbopen(rdb, host, port)) {
-        _failure(L, tcrdberrmsg(tcrdbecode(rdb)));
+    TCRDB* db = tcrdbnew();
+    if (!tcrdbopen(db, host, port)) {
+        _failure(L, tcrdberrmsg(tcrdbecode(db)));
     } else {
-        lua_pushlightuserdata(L, rdb);
+        lua_pushlightuserdata(L, db);
         lua_setfield(L, 2, __xyz);      // instance.__xyz = <userdata>
     }
 
@@ -233,8 +239,8 @@ static int _add(lua_State* L, TCRDB* db) {
  *
  * ttyrant:open()
  */
-static int luaF_ttyrant_new(lua_State* L) {
-    return _new(L, "ttyrant", "__rdb");
+static int luaF_ttyrant_open(lua_State* L) {
+    return _open(L, "ttyrant", "__rdb");
 }
 
 /*
@@ -323,7 +329,7 @@ static int luaF_ttyrant_get(lua_State* L) {
         if (!items) {
             _failure(L, tcrdberrmsg(tcrdbecode(db)));
         }
-        _tclist2luatable(L, items);
+        _tclist2luatable(L, items, 1);
 
     // single key
     } else if (lua_gettop(L) == 2) {
@@ -344,7 +350,7 @@ static int luaF_ttyrant_get(lua_State* L) {
         if (!items) {
             _failure(L, tcrdberrmsg(tcrdbecode(db)));
         }
-        _tclist2luatable(L, items);
+        _tclist2luatable(L, items, 1);
     }
 
     // done
@@ -400,8 +406,8 @@ static int luaF_ttyrant_out(lua_State* L) {
  *
  * ttyrant.table:open()
  */
-static int luaF_ttyrant_table_new(lua_State* L) {
-    return _new(L, "ttyrant.table", "__tdb");
+static int luaF_ttyrant_table_open(lua_State* L) {
+    return _open(L, "ttyrant.table", "__tdb");
 }
 
 /*
@@ -545,6 +551,168 @@ static int luaF_ttyrant_table_out(lua_State* L) {
 /*----------------------------------------------------------------------------------------------------------*/
 
 /*
+ * Create a query object.
+ *
+ * ttyrant.query:new()
+ */
+static int luaF_ttyrant_query_new(lua_State* L) {
+
+    // instance
+    if (!lua_istable(L, 1)) {
+        luaL_error(L, "Invalid «self» given to ttyrant.query:new(), expected «ttyrant.query»!");
+    }
+    TCRDB* db = _self(L, 2, "__tdb", "Invalid «ttyrant.table» instance given to ttyrant.query:new()!");
+    lua_newtable(L);
+
+    // metatable
+    lua_pushvalue(L, 1);
+    lua_setfield(L, 1, "__index");      // self.__index = self
+    lua_pushvalue(L, 1);
+    lua_setmetatable(L, 3);             // setmetatable(instance, self)
+
+    // spawn query
+    RDBQRY* qry = tcrdbqrynew(db);
+    if (!qry) {
+        _failure(L, tcrdberrmsg(tcrdbecode(db)));
+    } else {
+        lua_pushlightuserdata(L, qry);
+        lua_setfield(L, 3, "__qry");    // instance.__qry = <userdata>
+    }
+
+    // ready
+    return 1;
+}
+
+/*
+ * Destroy a query object.
+ *
+ * ttyrant.query:delete()
+ */
+static int luaF_ttyrant_query_delete(lua_State* L) {
+
+    // instance
+    RDBQRY* qry = _self_qry(L);
+
+    // release
+    tcrdbqrydel(qry);
+
+    // ready
+    lua_pushboolean(L, 1);
+    return 1;
+}
+
+/*
+ * Add a filtering rule to a query object.
+ *
+ * ttyrant.query:add_condition()
+ */
+static int luaF_ttyrant_query_add_condition(lua_State* L) {
+
+    // instance
+    RDBQRY* qry = _self_qry(L);
+
+    // column
+    const char* column = luaL_checkstring(L, 2);
+
+    // nominal indicator table
+    static const char* const operator_names[] = {
+        "RDBQCSTREQ",
+        "RDBQCSTRINC",
+        "RDBQCSTRBW",
+        "RDBQCSTREW",
+        "RDBQCSTRAND",
+        "RDBQCSTROR",
+        "RDBQCSTROREQ",
+        "RDBQCSTRRX",
+        "RDBQCNUMEQ",
+        "RDBQCNUMGT",
+        "RDBQCNUMGE",
+        "RDBQCNUMLT",
+        "RDBQCNUMLE",
+        "RDBQCNUMBT",
+        "RDBQCNUMOREQ",
+        "RDBQCFTSPH",
+        "RDBQCFTSAND",
+        "RDBQCFTSOR",
+        "RDBQCFTSEX",
+        "RDBQCNEGATE",
+        "RDBQCNOIDX",
+        NULL
+    };
+
+    // scalar indicator table
+    static const int operator_values[] = {
+        RDBQCSTREQ,
+        RDBQCSTRINC,
+        RDBQCSTRBW,
+        RDBQCSTREW,
+        RDBQCSTRAND,
+        RDBQCSTROR,
+        RDBQCSTROREQ,
+        RDBQCSTRRX,
+        RDBQCNUMEQ,
+        RDBQCNUMGT,
+        RDBQCNUMGE,
+        RDBQCNUMLT,
+        RDBQCNUMLE,
+        RDBQCNUMBT,
+        RDBQCNUMOREQ,
+        RDBQCFTSPH,
+        RDBQCFTSAND,
+        RDBQCFTSOR,
+        RDBQCFTSEX,
+        RDBQCNEGATE,
+        RDBQCNOIDX,
+        0
+    };
+
+    // get indicator
+    int operator = luaL_checkoption(L, 3, NULL, operator_names);
+
+    // operand expression
+    char buffer[64];
+    const char* expression = NULL;
+    if (lua_type(L, 4) == LUA_TSTRING) {
+        expression = luaL_checkstring(L, 4);
+    } else {
+        if (snprintf(buffer, 64, "%f", luaL_checknumber(L, 4)) >= 0) {
+            expression = buffer;
+        }
+    }
+
+    // execute
+    if (expression) {
+        tcrdbqryaddcond(qry, column, operator, expression);
+    }
+
+    // ready
+    lua_pushboolean(L, expression != NULL);
+    return 1;
+}
+
+/*
+ * Perform a search using the given query object.
+ *
+ * ttyrant.query:search()
+ */
+static int luaF_ttyrant_query_search(lua_State* L) {
+
+    // instance
+    RDBQRY* qry = _self_qry(L);
+
+    // execute
+    TCLIST* items = tcrdbqrysearch(qry);
+    _tclist2luatable(L, items, 0);
+    tclistdel(items);
+
+
+    // ready
+    return 1;
+}
+
+/*----------------------------------------------------------------------------------------------------------*/
+
+/*
  * Setup defaults.
  */
 #define _defaults(L)  { lua_pushstring(L, "localhost"); \
@@ -559,32 +727,34 @@ int luaopen_ttyrant(lua_State* L) {
 
     // rdb registry
     static const luaL_Reg ttyrant[] = {
-        { "new",    luaF_ttyrant_new },
-        { "close",  luaF_ttyrant_close },
-        { "add",    luaF_ttyrant_add },
-        { "put",    luaF_ttyrant_put },
-        { "get",    luaF_ttyrant_get },
-        { "out",    luaF_ttyrant_out },
+        { "open",           luaF_ttyrant_open },
+        { "close",          luaF_ttyrant_close },
+        { "add",            luaF_ttyrant_add },
+        { "put",            luaF_ttyrant_put },
+        { "get",            luaF_ttyrant_get },
+        { "out",            luaF_ttyrant_out },
         { NULL, NULL }
     };
 
     // table registry
     static const luaL_Reg ttyrant_table[] = {
-        { "new",    luaF_ttyrant_table_new },
-        { "close",  luaF_ttyrant_table_close },
-        { "add",    luaF_ttyrant_table_add },
-        { "put",    luaF_ttyrant_table_put },
-        { "get",    luaF_ttyrant_table_get },
-        { "out",    luaF_ttyrant_table_out },
+        { "open",           luaF_ttyrant_table_open },
+        { "close",          luaF_ttyrant_table_close },
+        { "add",            luaF_ttyrant_table_add },
+        { "put",            luaF_ttyrant_table_put },
+        { "get",            luaF_ttyrant_table_get },
+        { "out",            luaF_ttyrant_table_out },
         { NULL, NULL }
     };
 
     // query registry
-/*    static const luaL_Reg ttyrant_query[] = { */
-/*        { "new",       luaF_ttyrant_query_new },*/
-/*        { "close",     luaF_ttyrant_query_close },*/
-/*        { NULL, NULL }*/
-/*    };*/
+    static const luaL_Reg ttyrant_query[] = {
+        { "new",            luaF_ttyrant_query_new },
+        { "delete",         luaF_ttyrant_query_delete },
+        { "add_condition",  luaF_ttyrant_query_add_condition },
+        { "search",         luaF_ttyrant_query_search },
+        { NULL, NULL }
+    };
 
     // publish
     luaL_register(L, "ttyrant", ttyrant);
@@ -592,8 +762,8 @@ int luaopen_ttyrant(lua_State* L) {
     luaL_register(L, "ttyrant.table", ttyrant_table);
     _defaults(L);
     lua_pop(L, 1);
-/*    luaL_register(L, "ttyrant.query", ttyrant_query);*/
-/*    lua_pop(L, 1);*/
+    luaL_register(L, "ttyrant.query", ttyrant_query);
+    lua_pop(L, 1);
 
     // ready
     return 1;

@@ -1,6 +1,7 @@
 --- Project --------------------------------------------------------------------------------------------------
 
-    *lua-ttyrant*
+    LUA-TTYRANT
+
     A Lua binding to the C API of the TokyoTyrant key-value database server.
     Written by Valeriu Paloş (Copyright 2010).
 
@@ -15,48 +16,6 @@
 
     The goal of lua-ttyrant is to be a stable, binary-safe and complete binding of the Tyrant C API in Lua.
     For the moment I use TokyoTyrant version 1.1.41 as the reference API.
-
---- Status ---------------------------------------------------------------------------------------------------
-
-    The library is still in development meaning that the API has not been fully implemented yet. However
-    it is already quite stable and my company actually uses it in production from 2 Xavante-based servers.
-    Right now I am actively working on it and I will (hopefully) have it completed quite soon.
-
-    Here is a list of functions not yet transported (they will disappear as they are done):
-
-    - tcrdbputkeep()
-    - tcrdbputcat()
-    - tcrdbputshl()
-    - tcrdbputnr()
-    - tcrdbget3()
-    - tcrdbvsiz()
-    - tcrdbiterinit()
-    - tcrdbiternext()
-    - tcrdbfwmkeys()
-    - tcrdbext()
-    - tcrdbsync()
-    - tcrdboptimize()
-    - tcrdbvanish()
-    - tcrdbcopy()
-    - tcrdbrestore()
-    - tcrdbsetmst()/tcrdbsetmst2()
-    - tcrdbrnum()
-    - tcrdbsize()
-    - tcrdbstat()
-    - tcrdbtblputkeep()
-    - tcrdbtblputcat()
-    - tcrdbtblsetindex()
-    - tcrdbtblgenuid()
-    - tcrdbqrysetorder()
-    - tcrdbqrysetlimit()
-    - tcrdbqrysearchout()
-    - tcrdbqrysearchget()
-    - tcrdbqryrescols()
-    - tcrdbqrysearchcount()
-    - tcrdbqryhint()
-    - tcrdbmetasearch()
-    - tcrdbparasearch()
-
 
 --- License --------------------------------------------------------------------------------------------------
 
@@ -164,5 +123,46 @@
 
     --> Since Lua make no difference between integers and doubles, the functions tcrdbaddint() and
         tcrdbadddouble() are merged into the function ttyrant:add() (and also ttyrant.table:add()).
+
+--- Status ---------------------------------------------------------------------------------------------------
+
+    The library is still in development meaning that the API has not been fully implemented yet. However
+    it is already quite stable and my company actually uses it in production from 2 Xavante-based servers.
+    Right now I am actively working on it and I will (hopefully) have it completed quite soon.
+
+    Functions not yet supported (they are removed from this list as they are implemented):
+
+    - tcrdbputkeep()
+    - tcrdbputcat()
+    - tcrdbputshl()
+    - tcrdbputnr()
+    - tcrdbget3()
+    - tcrdbvsiz()
+    - tcrdbiterinit()
+    - tcrdbiternext()
+    - tcrdbfwmkeys()
+    - tcrdbext()
+    - tcrdbsync()
+    - tcrdboptimize()
+    - tcrdbvanish()
+    - tcrdbcopy()
+    - tcrdbrestore()
+    - tcrdbsetmst()/tcrdbsetmst2()
+    - tcrdbrnum()
+    - tcrdbsize()
+    - tcrdbstat()
+    - tcrdbtblputkeep()
+    - tcrdbtblputcat()
+    - tcrdbtblsetindex()
+    - tcrdbtblgenuid()
+    - tcrdbqrysetorder()
+    - tcrdbqrysetlimit()
+    - tcrdbqrysearchout()
+    - tcrdbqrysearchget()
+    - tcrdbqryrescols()
+    - tcrdbqrysearchcount()
+    - tcrdbqryhint()
+    - tcrdbmetasearch()
+    - tcrdbparasearch()
 
 --- End ------------------------------------------------------------------------------------------------------

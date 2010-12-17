@@ -155,8 +155,6 @@
     - tcrdbtblputcat()
     - tcrdbtblsetindex()
     - tcrdbtblgenuid()
-    - tcrdbqrysetorder()
-    - tcrdbqrysetlimit()
     - tcrdbqrysearchout()
     - tcrdbqrysearchget()
     - tcrdbqryrescols()

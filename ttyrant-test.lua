@@ -140,6 +140,23 @@ assert(#result == 1)
 -- ttyrant.query:delete()
 assert(qr:delete())
 
+-- ttyrant.query:set_limit()
+-- ttyrant.query:set_order()
+assert(tt:put('student1', { grade = '1' }))
+assert(tt:put('student2', { grade = '10' }))
+assert(tt:put('student3', { grade = '100' }))
+assert(tt:put('student4', { grade = '999' }))
+assert(tt:put('student5', { grade = '43.7' }))
+local qr = assert(ttyrant.query:new(tt))
+assert(qr:add_condition('grade', 'numge', '0'))
+assert(qr:set_limit(3))
+assert(qr:set_order('grade', 'numdesc'))
+local result = assert(qr:search())
+assert(#result == 3)
+assert(result[1] == 'student4')
+assert(result[2] == 'student3')
+assert(result[3] == 'student5')
+assert(qr:delete())
 
 --
 -- Success.

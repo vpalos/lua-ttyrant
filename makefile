@@ -18,6 +18,6 @@ clean:
 	rm -rf *.so
 
 ttyrant.so: ttyrant.c
-	@ echo -n "ttyrant.so... "
+	@ echo -n "ttyrant.so..."
 	@ $(CC) $(CFLAGS) $(LFLAGS) -o $@ ttyrant.c
 	@ echo "OK"

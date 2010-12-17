@@ -238,7 +238,7 @@ static int _add(lua_State* L, TCRDB* db) {
 /*
  * Open a regular database.
  *
- * ttyrant:open()
+ * <object> = ttyrant:open()
  */
 static int luaF_ttyrant_open(lua_State* L) {
     return _open(L, "ttyrant", "__rdb");
@@ -247,7 +247,7 @@ static int luaF_ttyrant_open(lua_State* L) {
 /*
  * Close a database (any type).
  *
- * ttyrant:close()
+ * <boolean> = ttyrant:close()
  */
 static int luaF_ttyrant_close(lua_State* L) {
     return _close(L, _self_rdb(L));
@@ -256,7 +256,7 @@ static int luaF_ttyrant_close(lua_State* L) {
 /*
  * Increment numeric value at key.
  *
- * # = ttyrant:add(key, amount)
+ * <number> = ttyrant:add(key, amount)
  */
 static int luaF_ttyrant_add(lua_State* L) {
     return _add(L, _self_rdb(L));
@@ -265,8 +265,8 @@ static int luaF_ttyrant_add(lua_State* L) {
 /*
  * Store value(s) at key(s) in db.
  *
- * true|false = ttyrant:put(key1, value1, key2, value2, ...)
- * true|false = ttyrant:put{ key1 = value1, key2 = value2, ... }
+ * <boolean> = ttyrant:put(key1, value1, key2, value2, ...)
+ * <boolean> = ttyrant:put{ key1 = value1, key2 = value2, ... }
  */
 static int luaF_ttyrant_put(lua_State* L) {
 
@@ -314,8 +314,8 @@ static int luaF_ttyrant_put(lua_State* L) {
 /*
  * Get value(s) at key(s) from db.
  *
- * value = ttyrant:get(key1, key2, ...)
- * value = ttyrant:get{key1, key2, ...}
+ * <value> = ttyrant:get(key1, key2, ...)
+ * <value> = ttyrant:get{key1, key2, ...}
  */
 static int luaF_ttyrant_get(lua_State* L) {
 
@@ -361,8 +361,8 @@ static int luaF_ttyrant_get(lua_State* L) {
 /*
  * Erase key(s) from db.
  *
- * true|false = ttyrant:out(key1, key2, ...)
- * true|false = ttyrant:out{key1, key2, ...}
+ * <boolean> = ttyrant:out(key1, key2, ...)
+ * <boolean> = ttyrant:out{key1, key2, ...}
  */
 static int luaF_ttyrant_out(lua_State* L) {
 
@@ -411,7 +411,7 @@ static int luaF_ttyrant_out(lua_State* L) {
 /*
  * Open a regular database.
  *
- * ttyrant.table:open()
+ * <object> = ttyrant.table:open()
  */
 static int luaF_ttyrant_table_open(lua_State* L) {
     return _open(L, "ttyrant.table", "__tdb");
@@ -420,7 +420,7 @@ static int luaF_ttyrant_table_open(lua_State* L) {
 /*
  * Close a database (any type).
  *
- * ttyrant.table:close()
+ * <boolean> = ttyrant.table:close()
  */
 static int luaF_ttyrant_table_close(lua_State* L) {
     return _close(L, _self_tdb(L));
@@ -429,7 +429,7 @@ static int luaF_ttyrant_table_close(lua_State* L) {
 /*
  * Increment '_num' column of tuple at key.
  *
- * # = ttyrant.table:add(key, amount)
+ * <number> = ttyrant.table:add(key, amount)
  */
 static int luaF_ttyrant_table_add(lua_State* L) {
     return _add(L, _self_tdb(L));
@@ -438,7 +438,7 @@ static int luaF_ttyrant_table_add(lua_State* L) {
 /*
  * Store tuple in db.
  *
- * true|false = ttyrant.table:put(key, {})
+ * <boolean> = ttyrant.table:put(key, {})
  */
 static int luaF_ttyrant_table_put(lua_State* L) {
 
@@ -496,7 +496,7 @@ static int luaF_ttyrant_table_put(lua_State* L) {
 /*
  * Get tuple from db.
  *
- * {} = ttyrant.table:get(key)
+ * <table> = ttyrant.table:get(key)
  */
 static int luaF_ttyrant_table_get(lua_State* L) {
 
@@ -534,7 +534,7 @@ static int luaF_ttyrant_table_get(lua_State* L) {
 /*
  * Erase tuple from db.
  *
- * true|false = ttyrant.table:out(key)
+ * <boolean> = ttyrant.table:out(key)
  */
 static int luaF_ttyrant_table_out(lua_State* L) {
 
@@ -560,7 +560,7 @@ static int luaF_ttyrant_table_out(lua_State* L) {
 /*
  * Create a query object.
  *
- * ttyrant.query:new()
+ * <object> = ttyrant.query:new()
  */
 static int luaF_ttyrant_query_new(lua_State* L) {
 
@@ -593,7 +593,7 @@ static int luaF_ttyrant_query_new(lua_State* L) {
 /*
  * Destroy a query object.
  *
- * ttyrant.query:delete()
+ * <boolean> = ttyrant.query:delete()
  */
 static int luaF_ttyrant_query_delete(lua_State* L) {
 
@@ -611,7 +611,7 @@ static int luaF_ttyrant_query_delete(lua_State* L) {
 /*
  * Add a filtering rule to a query object.
  *
- * ttyrant.query:add_condition()
+ * true|false = ttyrant.query:add_condition(column, operator, expression)
  */
 static int luaF_ttyrant_query_add_condition(lua_State* L) {
 
@@ -706,9 +706,81 @@ static int luaF_ttyrant_query_add_condition(lua_State* L) {
 }
 
 /*
+ * Limit the query result set.
+ *
+ * <boolean> = ttyrant.query:set_limit(limit[, offset])
+ */
+static int luaF_ttyrant_query_set_limit(lua_State* L) {
+
+    // instance
+    RDBQRY* qry = _self_qry(L);
+
+    // limits
+    int limit = luaL_checkint(L, 2);
+    int offset = lua_tointeger(L, 3);
+
+    // apply
+    tcrdbqrysetlimit(qry, limit, offset);
+
+    // ready
+    lua_pushboolean(L, 1);
+    return 1;
+}
+
+/*
+ * Choose a search ordering.
+ *
+ * <boolean> = ttyrant.query:set_order(column, method)
+ */
+static int luaF_ttyrant_query_set_order(lua_State* L) {
+
+    // instance
+    RDBQRY* qry = _self_qry(L);
+
+    // column
+    const char* column = luaL_checkstring(L, 2);
+
+    // nominal indicator table
+    static const char* const method_names[] = {
+        "STRASC",
+        "STRDESC",
+        "NUMASC",
+        "NUMDESC",
+        NULL
+    };
+
+    // scalar indicator table
+    static const int method_values[] = {
+        RDBQOSTRASC,
+        RDBQOSTRDESC,
+        RDBQONUMASC,
+        RDBQONUMDESC,
+        0
+    };
+
+    // extract indicator
+    const char* method = luaL_checkstring(L, 3);
+    char* p = (char*)method - 1;
+    while (*(++p)) if (islower(*p)) *p = toupper(*p);
+    if (strstr(method, "RDBQO") == method) method += strlen("RDBQO");
+
+    // extract method
+    lua_pushstring(L, method);
+    int sort = luaL_checkoption(L, -1, NULL, method_names);
+    lua_pop(L, 1);
+
+    // execute
+    tcrdbqrysetorder(qry, column, sort);
+
+    // ready
+    lua_pushboolean(L, 1);
+    return 1;
+}
+
+/*
  * Perform a search using the given query object.
  *
- * ttyrant.query:search()
+ * <table> = ttyrant.query:search()
  */
 static int luaF_ttyrant_query_search(lua_State* L) {
 
@@ -719,7 +791,6 @@ static int luaF_ttyrant_query_search(lua_State* L) {
     TCLIST* items = tcrdbqrysearch(qry);
     _tclist2luatable(L, items, 0);
     tclistdel(items);
-
 
     // ready
     return 1;
@@ -767,6 +838,8 @@ int luaopen_ttyrant(lua_State* L) {
         { "new",            luaF_ttyrant_query_new },
         { "delete",         luaF_ttyrant_query_delete },
         { "add_condition",  luaF_ttyrant_query_add_condition },
+        { "set_limit",      luaF_ttyrant_query_set_limit },
+        { "set_order",      luaF_ttyrant_query_set_order },
         { "search",         luaF_ttyrant_query_search },
         { NULL, NULL }
     };

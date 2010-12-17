@@ -5,6 +5,7 @@
  * This library is under the BSD license (see README file).
  */
 
+#include <ctype.h>
 #include <lua.h>
 #include <lauxlib.h>
 #include <stdlib.h>
@@ -622,27 +623,27 @@ static int luaF_ttyrant_query_add_condition(lua_State* L) {
 
     // nominal indicator table
     static const char* const operator_names[] = {
-        "RDBQCSTREQ",
-        "RDBQCSTRINC",
-        "RDBQCSTRBW",
-        "RDBQCSTREW",
-        "RDBQCSTRAND",
-        "RDBQCSTROR",
-        "RDBQCSTROREQ",
-        "RDBQCSTRRX",
-        "RDBQCNUMEQ",
-        "RDBQCNUMGT",
-        "RDBQCNUMGE",
-        "RDBQCNUMLT",
-        "RDBQCNUMLE",
-        "RDBQCNUMBT",
-        "RDBQCNUMOREQ",
-        "RDBQCFTSPH",
-        "RDBQCFTSAND",
-        "RDBQCFTSOR",
-        "RDBQCFTSEX",
-        "RDBQCNEGATE",
-        "RDBQCNOIDX",
+        "STREQ",
+        "STRINC",
+        "STRBW",
+        "STREW",
+        "STRAND",
+        "STROR",
+        "STROREQ",
+        "STRRX",
+        "NUMEQ",
+        "NUMGT",
+        "NUMGE",
+        "NUMLT",
+        "NUMLE",
+        "NUMBT",
+        "NUMOREQ",
+        "FTSPH",
+        "FTSAND",
+        "FTSOR",
+        "FTSEX",
+        "NEGATE",
+        "NOIDX",
         NULL
     };
 
@@ -672,8 +673,16 @@ static int luaF_ttyrant_query_add_condition(lua_State* L) {
         0
     };
 
-    // get indicator
-    int operator = luaL_checkoption(L, 3, NULL, operator_names);
+    // extract indicator
+    const char* indicator = luaL_checkstring(L, 3);
+    char* p = (char*)indicator - 1;
+    while (*(++p)) if (islower(*p)) *p = toupper(*p);
+    if (strstr(indicator, "RDBQC") == indicator) indicator += strlen("RDBQC");
+
+    // extract operator
+    lua_pushstring(L, indicator);
+    int operator = luaL_checkoption(L, -1, NULL, operator_names);
+    lua_pop(L, 1);
 
     // operand expression
     char buffer[64];

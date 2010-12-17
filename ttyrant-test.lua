@@ -130,8 +130,8 @@ assert(tt:add('abc',  3) == 8)
 local qr = assert(ttyrant.query:new(tt))
 
 -- ttyrant.query:add_condition()
-assert(qr:add_condition('b', 'RDBQCNUMGE', '4.56'))
-assert(qr:add_condition('c', 'RDBQCNUMLT', '7.90'))
+assert(qr:add_condition('b', 'RDBQCNUMGE', '4.56')) -- official rule naming convention
+assert(qr:add_condition('c', 'NumLt', '7.90'))      -- without 'RDBQC' prefix, case-insensitive
 
 -- ttyrant.query:search()
 local result = assert(qr:search())

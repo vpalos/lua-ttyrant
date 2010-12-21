@@ -124,6 +124,8 @@
     --> Since Lua make no difference between integers and doubles, the functions tcrdbaddint() and
         tcrdbadddouble() are merged into the function ttyrant:add() (and also ttyrant.table:add()).
 
+    --> Some functions were only used internally (e.g. tcrdbqryrescols()) since they have no meaning for Lua.
+
 --- Status ---------------------------------------------------------------------------------------------------
 
     The library is still in development meaning that the API has not been fully implemented yet. However
@@ -155,10 +157,6 @@
     - tcrdbtblputcat()
     - tcrdbtblsetindex()
     - tcrdbtblgenuid()
-    - tcrdbqrysearchout()
-    - tcrdbqrysearchget()
-    - tcrdbqryrescols()
-    - tcrdbqrysearchcount()
     - tcrdbqryhint()
     - tcrdbmetasearch()
     - tcrdbparasearch()

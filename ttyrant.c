@@ -778,7 +778,7 @@ static int luaF_ttyrant_query_set_order(lua_State* L) {
 }
 
 /*
- * Perform a search using the given query object.
+ * Get the list of keys corresponding to the query object.
  *
  * <table> = ttyrant.query:search()
  */
@@ -791,6 +791,85 @@ static int luaF_ttyrant_query_search(lua_State* L) {
     TCLIST* items = tcrdbqrysearch(qry);
     _tclist2luatable(L, items, 0);
     tclistdel(items);
+
+    // ready
+    return 1;
+}
+
+/*
+ * Remove all tuples corresponding to the query object.
+ *
+ * <table> = ttyrant.query:search_out()
+ */
+static int luaF_ttyrant_query_search_out(lua_State* L) {
+
+    // instance
+    RDBQRY* qry = _self_qry(L);
+
+    // execute
+    lua_pushboolean(L, tcrdbqrysearchout(qry));
+
+    // ready
+    return 1;
+}
+#include <stdio.h>
+/*
+ * Get the values of tuples which correspond to the query object.
+ *
+ * <table> = ttyrant.query:search_get()
+ */
+static int luaF_ttyrant_query_search_get(lua_State* L) {
+
+    // instance
+    RDBQRY* qry = _self_qry(L);
+
+    // execute
+    TCLIST* items = tcrdbqrysearchget(qry);
+
+
+    // initialize
+    lua_newtable(L);
+    char* item;
+    int itemsz;
+    TCLIST* columns;
+    int count = tclistnum(items);
+
+    // traverse
+    for (; count > 0; count--) {
+
+        // tuple
+        item = tclistshift(items, &itemsz);
+        columns = tcstrsplit2(item + 1, itemsz);
+        free(item);
+
+        // key/values
+        item = tclistshift(columns, &itemsz);
+        lua_pushlstring(L, item, itemsz);
+        free(item);
+        _tclist2luatable(L, columns, 1);
+
+        // store
+        tclistdel(columns);
+        lua_settable(L, -3);
+    }
+    tclistdel(items);
+
+    // ready
+    return 1;
+}
+
+/*
+ * Count the tuples which correspond to the query object.
+ *
+ * <table> = ttyrant.query:search_count()
+ */
+static int luaF_ttyrant_query_search_count(lua_State* L) {
+
+    // instance
+    RDBQRY* qry = _self_qry(L);
+
+    // execute
+    lua_pushinteger(L, tcrdbqrysearchcount(qry));
 
     // ready
     return 1;
@@ -841,6 +920,9 @@ int luaopen_ttyrant(lua_State* L) {
         { "set_limit",      luaF_ttyrant_query_set_limit },
         { "set_order",      luaF_ttyrant_query_set_order },
         { "search",         luaF_ttyrant_query_search },
+        { "search_get",     luaF_ttyrant_query_search_get },
+        { "search_out",     luaF_ttyrant_query_search_out },
+        { "search_count",   luaF_ttyrant_query_search_count },
         { NULL, NULL }
     };
 

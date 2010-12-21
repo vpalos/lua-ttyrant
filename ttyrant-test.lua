@@ -146,7 +146,7 @@ assert(tt:put('student1', { grade = '1' }))
 assert(tt:put('student2', { grade = '10' }))
 assert(tt:put('student3', { grade = '100' }))
 assert(tt:put('student4', { grade = '999' }))
-assert(tt:put('student5', { grade = '43.7' }))
+assert(tt:put('student5', { grade = '43.7', flowers = 'roses' }))
 local qr = assert(ttyrant.query:new(tt))
 assert(qr:add_condition('grade', 'numge', '0'))
 assert(qr:set_limit(3))
@@ -157,6 +157,19 @@ assert(result[1] == 'student4')
 assert(result[2] == 'student3')
 assert(result[3] == 'student5')
 assert(qr:delete())
+
+-- ttyrant.query:search_get()
+-- ttyrant.query:search_out()
+-- ttyrant.query:search_count()
+local qr = assert(ttyrant.query:new(tt))
+assert(qr:add_condition('grade', 'numeq', '43.7'))
+local result = assert(qr:search_get())
+assert(result['student5']['flowers'] == 'roses')
+assert(qr:search_count() == 1);
+assert(qr:search_out());
+assert(qr:search_count() == 0);
+assert(qr:delete())
+
 
 --
 -- Success.

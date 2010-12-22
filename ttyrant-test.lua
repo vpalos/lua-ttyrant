@@ -33,7 +33,10 @@ assert(th:put{ martyr1 = 'Valeriu Gafencu',
                martyr4 = 'Vasile Militaru',
                martyr5 = 'Costache Oprişan',
                martyr6 = 'Ioan Ianolide',
-               martyr7 = 'Corneliu Zelea Codreanu' })
+               martyr7 = 'Corneliu Zelea' })
+
+-- ttyrant:append()
+assert(th:append('martyr7', ' Codreanu'))
 
 -- ttyrant:put() - multiple keys at once given as list
 assert(th:put( 'saint1', 'Gheorghe',
@@ -84,11 +87,11 @@ assert(not th:get('martyr1'))
 assert(not th:get('martyr4'))
 assert(not th:get('saint6'))
 
--- ttyrant:add()
-assert(th:add('Key1',  3) == 3)
-assert(th:add('Key1',  3) == 6)
-assert(th:add('Key1', -1) == 5)
-assert(th:add('Key1',  3) == 8)
+-- ttyrant:increment()
+assert(th:increment('Key1',  3) == 3)
+assert(th:increment('Key1',  3) == 6)
+assert(th:increment('Key1', -1) == 5)
+assert(th:increment('Key1',  3) == 8)
 
 -- ttyrant:close()
 assert(th:close())
@@ -103,23 +106,27 @@ local tt = assert(ttyrant.table:open{ host ='localhost', port = 1979 })
 
 -- ttyrant.table:put()
 assert(tt:put('abc', { a = 1.23, b = 4.56, c = 7.89 }))
-assert(tt:put('123', { 1.11, 2.22, 3.33 }))
+assert(tt:append('abc', { d = 9.10 }))
+assert(tt:put('123', { [1] = 1.11, [2] = 2.22, [3] = 3.33 }))
+assert(tt:append('123', { [4] = 4.44 }))
 
 -- ttyrant.table:get()
 local vabc = assert(tt:get('abc'))
 local v123 = assert(tt:get('123'))
 assert(tonumber(vabc['a']) == 1.23)
+assert(tonumber(vabc['d']) == 9.10)
 assert(tonumber(v123['3']) == 3.33)
+assert(tonumber(v123['4']) == 4.44)
 
 -- ttyrant.table:out()
 assert(tt:out('123'))
 assert(not tt:get('123'))
 
--- ttyrant.table:add()
-assert(tt:add('abc',  3) == 3)
-assert(tt:add('abc',  3) == 6)
-assert(tt:add('abc', -1) == 5)
-assert(tt:add('abc',  3) == 8)
+-- ttyrant.table:increment()
+assert(tt:increment('abc',  3) == 3)
+assert(tt:increment('abc',  3) == 6)
+assert(tt:increment('abc', -1) == 5)
+assert(tt:increment('abc',  3) == 8)
 
 
 --
@@ -129,9 +136,9 @@ assert(tt:add('abc',  3) == 8)
 -- ttyrant.query:new()
 local qr = assert(ttyrant.query:new(tt))
 
--- ttyrant.query:add_condition()
-assert(qr:add_condition('b', 'RDBQCNUMGE', '4.56')) -- official rule naming convention
-assert(qr:add_condition('c', 'NumLt', '7.90'))      -- without 'RDBQC' prefix, case-insensitive
+-- ttyrant.query:filter()
+assert(qr:filter('b', 'RDBQCNUMGE', '4.56')) -- official rule naming convention
+assert(qr:filter('c', 'NumLt', '7.90'))      -- without 'RDBQC' prefix, case-insensitive
 
 -- ttyrant.query:search()
 local result = assert(qr:search())
@@ -140,17 +147,17 @@ assert(#result == 1)
 -- ttyrant.query:delete()
 assert(qr:delete())
 
--- ttyrant.query:set_limit()
--- ttyrant.query:set_order()
+-- ttyrant.query:limit()
+-- ttyrant.query:order()
 assert(tt:put('student1', { grade = '1' }))
 assert(tt:put('student2', { grade = '10' }))
 assert(tt:put('student3', { grade = '100' }))
 assert(tt:put('student4', { grade = '999' }))
 assert(tt:put('student5', { grade = '43.7', flowers = 'roses' }))
 local qr = assert(ttyrant.query:new(tt))
-assert(qr:add_condition('grade', 'numge', '0'))
-assert(qr:set_limit(3))
-assert(qr:set_order('grade', 'numdesc'))
+assert(qr:filter('grade', 'numge', '0'))
+assert(qr:limit(3))
+assert(qr:order('grade', 'numdesc'))
 local result = assert(qr:search())
 assert(#result == 3)
 assert(result[1] == 'student4')
@@ -162,7 +169,7 @@ assert(qr:delete())
 -- ttyrant.query:search_out()
 -- ttyrant.query:search_count()
 local qr = assert(ttyrant.query:new(tt))
-assert(qr:add_condition('grade', 'numeq', '43.7'))
+assert(qr:filter('grade', 'numeq', '43.7'))
 local result = assert(qr:search_get())
 assert(result['student5']['flowers'] == 'roses')
 assert(qr:search_count() == 1);

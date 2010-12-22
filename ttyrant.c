@@ -213,7 +213,7 @@ static int _close(lua_State* L, TCRDB* db) {
 /*
  * Increment value at key or '_num' column of tuple at key.
  */
-static int _add(lua_State* L, TCRDB* db) {
+static int _increment(lua_State* L, TCRDB* db) {
 
     // arguments
     size_t keysz;
@@ -228,6 +228,63 @@ static int _add(lua_State* L, TCRDB* db) {
 
     // sum
     lua_pushnumber(L, result);
+
+    // ready
+    return 1;
+}
+
+/*
+ * Store new tuple or extend an existing one in a table db.
+ */
+static int _put(lua_State* L, const char* error, int cat) {
+
+    // db
+    TCRDB* db = _self_tdb(L);
+
+    // tuple check
+    if (!lua_istable(L, 3)) {
+        luaL_error(L, error);
+    }
+
+    // key
+    size_t keysz;
+    const char* key = luaL_checklstring(L, 2, &keysz);
+
+    // assemble tuple
+    TCMAP* tuple = tcmapnew();
+    lua_pushnil(L);
+    while (lua_next(L, 3)) {
+
+        // key
+        ssize_t colsz;
+        const char* col = NULL;
+        char scol[64];
+        if (lua_type(L, -2) == LUA_TSTRING) {
+            col = luaL_checklstring(L, -2, &colsz);
+        } else {
+            colsz = snprintf(scol, 64, "%li", (long int)luaL_checkinteger(L, -2));
+            if (colsz < 0) {
+                _failure(L, tcrdberrmsg(tcrdbecode(db)));
+            }
+        }
+
+        // value
+        size_t valsz;
+        const char* val = luaL_checklstring(L, -1, &valsz);
+
+        // push
+        tcmapput(tuple, col ? col : scol, colsz, val, valsz);
+        lua_pop(L, 1);
+    }
+
+    // store
+    int result = cat ? tcrdbtblputcat(db, key, keysz, tuple) : tcrdbtblput(db, key, keysz, tuple);
+    if (!result) {
+        _failure(L, tcrdberrmsg(tcrdbecode(db)));
+    } else {
+        lua_pushboolean(L, 1);
+    }
+    tcmapdel(tuple);
 
     // ready
     return 1;
@@ -256,14 +313,14 @@ static int luaF_ttyrant_close(lua_State* L) {
 /*
  * Increment numeric value at key.
  *
- * <number> = ttyrant:add(key, amount)
+ * <number> = ttyrant:increment(key, amount)
  */
-static int luaF_ttyrant_add(lua_State* L) {
-    return _add(L, _self_rdb(L));
+static int luaF_ttyrant_increment(lua_State* L) {
+    return _increment(L, _self_rdb(L));
 }
 
 /*
- * Store value(s) at key(s) in db.
+ * Store value(s) at given key(s) in db.
  *
  * <boolean> = ttyrant:put(key1, value1, key2, value2, ...)
  * <boolean> = ttyrant:put{ key1 = value1, key2 = value2, ... }
@@ -300,6 +357,34 @@ static int luaF_ttyrant_put(lua_State* L) {
         }
         tclistdel(items);
     }
+
+    // result
+    if (!status) {
+        _failure(L, tcrdberrmsg(tcrdbecode(db)));
+    }
+    lua_pushboolean(L, 1);
+
+    // ready
+    return 1;
+}
+
+/*
+ * Append value at given key in db.
+ *
+ * <boolean> = ttyrant:append(key, value)
+ */
+static int luaF_ttyrant_append(lua_State* L) {
+
+    // initialize
+    TCRDB*  db = _self_rdb(L);
+    TCLIST* items = NULL;
+    int     status = 0;
+
+    // extract
+    size_t keysz, valuesz;
+    const char* key = luaL_checklstring(L, 2, &keysz);
+    const char* value = luaL_checklstring(L, 3, &valuesz);
+    status = tcrdbputcat(db, key, keysz, value, valuesz);
 
     // result
     if (!status) {
@@ -431,66 +516,26 @@ static int luaF_ttyrant_table_close(lua_State* L) {
  *
  * <number> = ttyrant.table:add(key, amount)
  */
-static int luaF_ttyrant_table_add(lua_State* L) {
-    return _add(L, _self_tdb(L));
+static int luaF_ttyrant_table_increment(lua_State* L) {
+    return _increment(L, _self_tdb(L));
 }
 
 /*
- * Store tuple in db.
+ * Create new tuple in the table db using given column values.
  *
  * <boolean> = ttyrant.table:put(key, {})
  */
 static int luaF_ttyrant_table_put(lua_State* L) {
+    return _put(L, "Invalid value given to «ttyrant.table:put()», expected a table/tuple!", 0);
+}
 
-    // db
-    TCRDB* db = _self_tdb(L);
-
-    // tuple check
-    if (!lua_istable(L, 3)) {
-        luaL_error(L, "Invalid value given to «ttyrant.table:put()», expected a table/tuple!");
-    }
-
-    // key
-    size_t keysz;
-    const char* key = luaL_checklstring(L, 2, &keysz);
-
-    // assemble tuple
-    TCMAP* tuple = tcmapnew();
-    lua_pushnil(L);
-    while (lua_next(L, 3)) {
-
-        // key
-        ssize_t colsz;
-        const char* col = NULL;
-        char scol[64];
-        if (lua_type(L, -2) == LUA_TSTRING) {
-            col = luaL_checklstring(L, -2, &colsz);
-        } else {
-            colsz = snprintf(scol, 64, "%li", (long int)luaL_checkinteger(L, -2));
-            if (colsz < 0) {
-                _failure(L, tcrdberrmsg(tcrdbecode(db)));
-            }
-        }
-
-        // value
-        size_t valsz;
-        const char* val = luaL_checklstring(L, -1, &valsz);
-
-        // push
-        tcmapput(tuple, col ? col : scol, colsz, val, valsz);
-        lua_pop(L, 1);
-    }
-
-    // store
-    if (!tcrdbtblput(db, key, keysz, tuple)) {
-        _failure(L, tcrdberrmsg(tcrdbecode(db)));
-    } else {
-        lua_pushboolean(L, 1);
-    }
-    tcmapdel(tuple);
-
-    // ready
-    return 1;
+/*
+ * Append given column values an existing tuple in the table db.
+ *
+ * <boolean> = ttyrant.table:append(key, {})
+ */
+static int luaF_ttyrant_table_append(lua_State* L) {
+    return _put(L, "Invalid value given to «ttyrant.table:append()», expected a table/tuple!", 1);
 }
 
 /*
@@ -611,9 +656,9 @@ static int luaF_ttyrant_query_delete(lua_State* L) {
 /*
  * Add a filtering rule to a query object.
  *
- * true|false = ttyrant.query:add_condition(column, operator, expression)
+ * true|false = ttyrant.query:filter(column, operator, expression)
  */
-static int luaF_ttyrant_query_add_condition(lua_State* L) {
+static int luaF_ttyrant_query_filter(lua_State* L) {
 
     // instance
     RDBQRY* qry = _self_qry(L);
@@ -708,9 +753,9 @@ static int luaF_ttyrant_query_add_condition(lua_State* L) {
 /*
  * Limit the query result set.
  *
- * <boolean> = ttyrant.query:set_limit(limit[, offset])
+ * <boolean> = ttyrant.query:limit(limit[, offset])
  */
-static int luaF_ttyrant_query_set_limit(lua_State* L) {
+static int luaF_ttyrant_query_limit(lua_State* L) {
 
     // instance
     RDBQRY* qry = _self_qry(L);
@@ -730,9 +775,9 @@ static int luaF_ttyrant_query_set_limit(lua_State* L) {
 /*
  * Choose a search ordering.
  *
- * <boolean> = ttyrant.query:set_order(column, method)
+ * <boolean> = ttyrant.query:order(column, method)
  */
-static int luaF_ttyrant_query_set_order(lua_State* L) {
+static int luaF_ttyrant_query_order(lua_State* L) {
 
     // instance
     RDBQRY* qry = _self_qry(L);
@@ -894,8 +939,9 @@ int luaopen_ttyrant(lua_State* L) {
     static const luaL_Reg ttyrant[] = {
         { "open",           luaF_ttyrant_open },
         { "close",          luaF_ttyrant_close },
-        { "add",            luaF_ttyrant_add },
+        { "increment",      luaF_ttyrant_increment },
         { "put",            luaF_ttyrant_put },
+        { "append",         luaF_ttyrant_append },
         { "get",            luaF_ttyrant_get },
         { "out",            luaF_ttyrant_out },
         { NULL, NULL }
@@ -905,8 +951,9 @@ int luaopen_ttyrant(lua_State* L) {
     static const luaL_Reg ttyrant_table[] = {
         { "open",           luaF_ttyrant_table_open },
         { "close",          luaF_ttyrant_table_close },
-        { "add",            luaF_ttyrant_table_add },
+        { "increment",      luaF_ttyrant_table_increment },
         { "put",            luaF_ttyrant_table_put },
+        { "append",         luaF_ttyrant_table_append },
         { "get",            luaF_ttyrant_table_get },
         { "out",            luaF_ttyrant_table_out },
         { NULL, NULL }
@@ -916,9 +963,9 @@ int luaopen_ttyrant(lua_State* L) {
     static const luaL_Reg ttyrant_query[] = {
         { "new",            luaF_ttyrant_query_new },
         { "delete",         luaF_ttyrant_query_delete },
-        { "add_condition",  luaF_ttyrant_query_add_condition },
-        { "set_limit",      luaF_ttyrant_query_set_limit },
-        { "set_order",      luaF_ttyrant_query_set_order },
+        { "filter",         luaF_ttyrant_query_filter },
+        { "limit",          luaF_ttyrant_query_limit },
+        { "order",          luaF_ttyrant_query_order },
         { "search",         luaF_ttyrant_query_search },
         { "search_get",     luaF_ttyrant_query_search_get },
         { "search_out",     luaF_ttyrant_query_search_out },

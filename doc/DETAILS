@@ -82,6 +82,21 @@
 
     --> Some functions were only used internally (e.g. tcrdbqryrescols()) since they have no meaning for Lua.
 
+--- Changes --------------------------------------------------------------------------------------------------
+
+    * 2012-02-18:
+    
+      - The keys() iterator function is depreciated in favor of iterator().
+      - The ttyrant:open() function has moved in the ttyrant.hash namespace (to match ttyrant.table).
+      - Passing a table of values to the open() functions is now depreciated; use either of:
+          - open("localhost:1978")
+          - open("localhost", 1978)
+      - Query objects are now garbage collected (the delete() method is now a noop).
+      - Query methods search_get, search_out, search_count are depreciated in favor of 
+        searchget, searchout, searchcount.
+        
+    For now all changes are backward-compatible (i.e. previous variants still work but are depreciated).
+
 --- Status ---------------------------------------------------------------------------------------------------
 
     The library is *almost* complete meaning that there are several functions which are not yet implemented;
@@ -95,7 +110,6 @@
 
     Functions not yet supported (they are removed from this list as they are implemented):
 
-    - tcrdbfwmkeys()
     - tcrdbrestore()
     - tcrdbget3()
     - tcrdboptimize()
@@ -105,5 +119,124 @@
     - tcrdbmetasearch()
     - tcrdbparasearch()
     - tcrdbext()
+
+--- Correlation ----------------------------------------------------------------------------------------------
+
+    This is how the original C functions correlate to the Lua functions:
+    
+    tcrdberrmsg         - (n/a)
+
+    tcrdbnew            - (n/a)
+
+    tcrdbdel            - (n/a)
+
+    tcrdbecode          - (n/a)
+
+    tcrdbtune           - *** TODO ***
+
+    tcrdbopen           - ttyrant.hash:open(), ttyrant.table:open()
+    tcrdbopen2
+
+    tcrdbclose          - <hash>:close(), <table>:close()
+
+    tcrdbput            - <hash>:put()
+    tcrdbput2
+
+    tcrdbputkeep        - <hash>:putkeep()
+    tcrdbputkeep2
+
+    tcrdbputcat         - <hash>:putcat()
+    tcrdbputcat2
+
+    tcrdbputshl         - <hash>:putshl()
+    tcrdbputshl2
+
+    tcrdbputnr          - <hash>:putnr()
+    tcrdbputnr2
+
+    tcrdbout            - <hash>:putout()
+    tcrdbout2
+
+    tcrdbget            - <hash>:get()
+    tcrdbget2
+
+    tcrdbget3           - *** TODO ***
+
+    tcrdbvsiz           - <hash>:vsiz()
+    tcrdbvsiz2
+
+    tcrdbiterinit       - <hash>:iterator(), <table>:iterator()
+    tcrdbiternext
+    tcrdbiternext2
+
+    tcrdbfwmkeys        - <hash>:fwmkeys(), <table>:fwmkeys()
+    tcrdbfwmkeys2
+
+    tcrdbaddint         - <hash>:increment(), <table>:increment()
+    tcrdbadddouble
+    
+    tcrdbext            - *** TODO ***
+    tcrdbext2
+    
+    tcrdbsync           - <hash>:sync(), <table>:sync()
+    
+    tcrdboptimize       - *** TODO ***
+
+    tcrdbvanish         - <hash>:vanish(), <table>:vanish()
+
+    tcrdbcopy           - <hash>:copy(), <table>:copy()
+
+    tcrdbrestore        - *** TODO ***
+
+    tcrdbsetmst         - *** TODO ***
+    tcrdbsetmst2
+
+    tcrdbrnum           - <hash>:rnum(), <table>:rnum()
+
+    tcrdbsize           - <hash>:size(), <table>:size()
+
+    tcrdbstat           - <hash>:stat(), <table>:stat()
+
+    tcrdbmisc           - (n/a)
+
+    tcrdbtblput         - <table>:put()
+
+    tcrdbtblputkeep     - <table>:putkeep()
+
+    tcrdbtblputcat      - <table>:putcat()
+
+    tcrdbtblout         - <table>:out()
+
+    tcrdbtblget         - <table>:get()
+
+    tcrdbtblsetindex    - <table>:setindex()
+
+    tcrdbtblgenuid      *** TODO ***
+
+    tcrdbqrynew         - ttyrant.query:new()
+
+    tcrdbqrydel         - (n/a)
+
+    tcrdbqryaddcond     - <query>:addcond()
+
+    tcrdbqrysetorder    - <query>:setorder()
+
+    tcrdbqrysetlimit    - <query>:setlimit()
+
+    tcrdbqrysearch      - <query>:search()
+
+    tcrdbqrysearchout   - <query>:searchout()
+
+    tcrdbqrysearchget   - <query>:searchget()
+
+    tcrdbqryrescols     - (n/a)
+
+    tcrdbqrysearchcount - <query>:search_count()
+
+    tcrdbqryhint        - *** TODO ***
+
+    tcrdbmetasearch     - *** TODO ***
+
+    tcrdbparasearch     - *** TODO ***
 
 --- End ------------------------------------------------------------------------------------------------------

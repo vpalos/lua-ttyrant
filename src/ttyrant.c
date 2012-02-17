@@ -169,8 +169,26 @@ static int _open(lua_State* L, const char* class, const char* __xyz) {
 
     // instance
     if (!lua_istable(L, 1)) {
-        luaL_error(L, "Invalid «self» for %class:open(), expected «%s»!", class, class);
-    } else if (lua_gettop(L) < 2) {
+        return luaL_error(L, "Invalid «self» for %class:open(), expected «%s»!", class, class);
+    } 
+    
+    // prepare
+    TCRDB* db = tcrdbnew();
+    const char* host;
+    int port = -1;
+    
+    // depreciated (table-argument version)
+    if (lua_gettop(L) == 2 && lua_istable(L, 2)) {
+        lua_getfield(L, 2, "host");
+        lua_getfield(L, 2, "port");
+        host = luaL_checkstring(L, -2);
+        port = luaL_checkinteger(L, -1);
+        lua_pop(L, 2);
+    } else {
+        host = luaL_checkstring(L, 2);
+        if (!lua_isnoneornil(L, 3)) {
+            port = lua_tointeger(L, 3);
+        }
         lua_newtable(L);
     }
 
@@ -178,60 +196,18 @@ static int _open(lua_State* L, const char* class, const char* __xyz) {
     lua_pushvalue(L, 1);
     lua_setfield(L, 1, "__index");      // self.__index = self
     lua_pushvalue(L, 1);
-    lua_setmetatable(L, 2);             // setmetatable(instance, self)
-
-    // options
-    lua_getfield(L, 2, "host");
-    lua_getfield(L, 2, "port");
-    const char* host = luaL_checkstring(L, -2);
-    int port = luaL_checkinteger(L, -1);
-    lua_pop(L, 2);
+    lua_setmetatable(L, -2);            // setmetatable(instance, self)
 
     // open db
-    TCRDB* db = tcrdbnew();
-    if (!tcrdbopen(db, host, port)) {
+    int result = port == -1 ? tcrdbopen2(db, host) : tcrdbopen(db, host, port);
+    if (!result) {
         _failure(L, tcrdberrmsg(tcrdbecode(db)));
     } else {
         lua_pushlightuserdata(L, db);
-        lua_setfield(L, 2, __xyz);      // instance.__xyz = <userdata>
+        lua_setfield(L, -2, __xyz);     // instance.__xyz = <userdata>
         lua_pushlightuserdata(L, db);
-        lua_setfield(L, 2, "__any");    // instance.__any = <userdata>
+        lua_setfield(L, -2, "__any");   // instance.__any = <userdata>
     }
-
-    // ready
-    return 1;
-}
-
-/*
- * Close a database.
- */
-static int _close(lua_State* L, TCRDB* db) {
-    if (!tcrdbclose(db)) {
-        _failure(L, tcrdberrmsg(tcrdbecode(db)));
-    }
-    tcrdbdel(db);
-    lua_pushboolean(L, 1);
-    return 1;
-}
-
-/*
- * Increment value at key or '_num' column of tuple at key.
- */
-static int _increment(lua_State* L, TCRDB* db) {
-
-    // arguments
-    size_t keysz;
-    const char* key = luaL_checklstring(L, 2, &keysz);
-    double amount = luaL_checknumber(L, 3);
-
-    // increment
-    double result = tcrdbadddouble(db, key, keysz, amount);
-    if (result == INT_MIN) {
-        _failure(L, tcrdberrmsg(tcrdbecode(db)));
-    }
-
-    // sum
-    lua_pushnumber(L, result);
 
     // ready
     return 1;
@@ -351,6 +327,56 @@ static int _table_put(lua_State* L, const char* error, int kind) {
 }
 
 /*----------------------------------------------------------------------------------------------------------*/
+
+/*
+ * Close a database.
+ *
+ * <boolean> = <any>:close()
+ */
+static int luaF_any_close(lua_State* L) {
+
+    // extract/execute
+    TCRDB* db = _self_any(L);
+    if (!tcrdbclose(db)) {
+        _failure(L, tcrdberrmsg(tcrdbecode(db)));
+    }
+    tcrdbdel(db);
+    
+    // ready
+    lua_pushboolean(L, 1);
+    return 1;
+}
+
+/*
+ * Increment value at key or '_num' column of tuple at key.
+ *
+ * <number> = <any>:add(key[, amount = 1])
+ */
+static int luaF_any_increment(lua_State* L) {
+
+    // extract
+    TCRDB* db = _self_any(L);
+
+    // arguments
+    size_t keysz;
+    const char* key = luaL_checklstring(L, 2, &keysz);
+    double amount = 1;
+    if (!lua_isnoneornil(L, 3)) {
+        amount = luaL_checknumber(L, 3);
+    }
+
+    // increment
+    double result = tcrdbadddouble(db, key, keysz, amount);
+    if (result == INT_MIN) {
+        _failure(L, tcrdberrmsg(tcrdbecode(db)));
+    }
+
+    // sum
+    lua_pushnumber(L, result);
+
+    // ready
+    return 1;
+}
 
 /*
  * Erase key(s) from any db.
@@ -512,6 +538,8 @@ static int luaF_any_stat(lua_State* L) {
 
 /*
  * Iterate over all keys in db.
+ *
+ * for key in <any>:keys() do ... end
  */
 static int _luaF_any_keys_iterator(lua_State* L) {
     
@@ -530,7 +558,7 @@ static int _luaF_any_keys_iterator(lua_State* L) {
     
     return 1;
 }
-static int luaF_any_keys(lua_State* L) {
+static int luaF_any_iterator(lua_State* L) {
     
     // extract
     TCRDB* db = _self_any(L);
@@ -546,6 +574,31 @@ static int luaF_any_keys(lua_State* L) {
     return 1;
 }
 
+/*
+ * Get keys by prefix (fporward-matching).
+ *
+ * <table> = <any>:fwmkeys(prefix[, max])
+ */
+static int luaF_any_fwmkeys(lua_State* L) {
+
+    // extract
+    TCRDB* db = _self_any(L);
+    size_t prefixsz = 0;
+    const char* prefix = luaL_checklstring(L, 2, &prefixsz);
+    int max = -1;
+    if (!lua_isnoneornil(L, 3)) {
+        max = luaL_checkint(L, 3);
+    }
+    
+    // execute
+    TCLIST* list = tcrdbfwmkeys(db, prefix, prefixsz, max);
+    _tclist2luatable(L, list, 0);
+    tclistdel(list);
+    
+    // ready
+    return 1;
+}
+
 /*----------------------------------------------------------------------------------------------------------*/
 
 /*
@@ -553,26 +606,8 @@ static int luaF_any_keys(lua_State* L) {
  *
  * <object> = ttyrant:open({ host = 'localhost', port = 1978 })
  */
-static int luaF_ttyrant_open(lua_State* L) {
+static int luaF_hash_open(lua_State* L) {
     return _open(L, "ttyrant", "__rdb");
-}
-
-/*
- * Close a regular database.
- *
- * <boolean> = ttyrant:close()
- */
-static int luaF_ttyrant_close(lua_State* L) {
-    return _close(L, _self_rdb(L));
-}
-
-/*
- * Increment numeric value at key.
- *
- * <number> = ttyrant:increment(key, amount)
- */
-static int luaF_ttyrant_increment(lua_State* L) {
-    return _increment(L, _self_rdb(L));
 }
 
 /*
@@ -584,7 +619,7 @@ static int luaF_ttyrant_increment(lua_State* L) {
  * Note: implemented explicitly since it translates multiple key-value
  *       pairs into single-shot operations (i.e. 'putlist') for speed.
  */
-static int luaF_ttyrant_put(lua_State* L) {
+static int luaF_hash_put(lua_State* L) {
 
     // initialize
     TCRDB*  db = _self_rdb(L);
@@ -632,7 +667,7 @@ static int luaF_ttyrant_put(lua_State* L) {
  *
  * <boolean> = ttyrant:putcat(key, value)
  */
-static int luaF_ttyrant_putcat(lua_State* L) {
+static int luaF_hash_putcat(lua_State* L) {
     return _put(L, PUT_CAT);
 }
 
@@ -641,7 +676,7 @@ static int luaF_ttyrant_putcat(lua_State* L) {
  *
  * <boolean> = ttyrant:putkeep(key, value)
  */
-static int luaF_ttyrant_putkeep(lua_State* L) {
+static int luaF_hash_putkeep(lua_State* L) {
     return _put(L, PUT_KEEP);
 }
 
@@ -650,7 +685,7 @@ static int luaF_ttyrant_putkeep(lua_State* L) {
  *
  * <boolean> = ttyrant:putshl(key, value, width)
  */
-static int luaF_ttyrant_putshl(lua_State* L) {
+static int luaF_hash_putshl(lua_State* L) {
 
     // initialize
     TCRDB*  db = _self_rdb(L);
@@ -676,7 +711,7 @@ static int luaF_ttyrant_putshl(lua_State* L) {
  *
  * <boolean> = ttyrant:putnr(key, value)
  */
-static int luaF_ttyrant_putnr(lua_State* L) {
+static int luaF_hash_putnr(lua_State* L) {
     return _put(L, PUT_NR);
 }
 
@@ -686,7 +721,7 @@ static int luaF_ttyrant_putnr(lua_State* L) {
  * <value> = ttyrant:get(key1, key2, ...)
  * <value> = ttyrant:get{key1, key2, ...}
  */
-static int luaF_ttyrant_get(lua_State* L) {
+static int luaF_hash_get(lua_State* L) {
 
     // initialize
     TCRDB*  db = _self_rdb(L);
@@ -732,7 +767,7 @@ static int luaF_ttyrant_get(lua_State* L) {
  *
  * <number> = ttyrant:vsiz(key)
  */
-static int luaF_ttyrant_vsiz(lua_State* L) {
+static int luaF_hash_vsiz(lua_State* L) {
 
     // initialize
     TCRDB*  db = _self_rdb(L);
@@ -759,26 +794,8 @@ static int luaF_ttyrant_vsiz(lua_State* L) {
  *
  * <object> = ttyrant.table:open({ host = 'localhost', port = 1978 })
  */
-static int luaF_ttyrant_table_open(lua_State* L) {
+static int luaF_table_open(lua_State* L) {
     return _open(L, "ttyrant.table", "__tdb");
-}
-
-/*
- * Close a table database.
- *
- * <boolean> = ttyrant.table:close()
- */
-static int luaF_ttyrant_table_close(lua_State* L) {
-    return _close(L, _self_tdb(L));
-}
-
-/*
- * Increment '_num' column of tuple at key.
- *
- * <number> = ttyrant.table:add(key, amount)
- */
-static int luaF_ttyrant_table_increment(lua_State* L) {
-    return _increment(L, _self_tdb(L));
 }
 
 /*
@@ -786,7 +803,7 @@ static int luaF_ttyrant_table_increment(lua_State* L) {
  *
  * <boolean> = ttyrant.table:put(key, {})
  */
-static int luaF_ttyrant_table_put(lua_State* L) {
+static int luaF_table_put(lua_State* L) {
     return _table_put(L, "Invalid value for «ttyrant.table:put()», expected a table/tuple!", PUT_NORMAL);
 }
 
@@ -795,7 +812,7 @@ static int luaF_ttyrant_table_put(lua_State* L) {
  *
  * <boolean> = ttyrant.table:putcat(key, {})
  */
-static int luaF_ttyrant_table_putcat(lua_State* L) {
+static int luaF_table_putcat(lua_State* L) {
     return _table_put(L, "Invalid value for «ttyrant.table:putcat()», expected a table/tuple!", PUT_CAT);
 }
 
@@ -804,7 +821,7 @@ static int luaF_ttyrant_table_putcat(lua_State* L) {
  *
  * <boolean> = ttyrant.table:putkeep(key, {})
  */
-static int luaF_ttyrant_table_putkeep(lua_State* L) {
+static int luaF_table_putkeep(lua_State* L) {
     return _table_put(L, "Invalid value for «ttyrant.table:putkeep()», expected a table/tuple!", PUT_KEEP);
 }
 
@@ -813,7 +830,7 @@ static int luaF_ttyrant_table_putkeep(lua_State* L) {
  *
  * <table> = ttyrant.table:get(key)
  */
-static int luaF_ttyrant_table_get(lua_State* L) {
+static int luaF_table_get(lua_State* L) {
 
     // db
     TCRDB* db = _self_tdb(L);
@@ -849,9 +866,9 @@ static int luaF_ttyrant_table_get(lua_State* L) {
 /*
  * Create an index on a column.
  *
- * <boolean> = ttyrant.table:setindex(column, type, keep)
+ * <boolean> = ttyrant.table:setindex(column, type[, keep = false])
  */
-static int luaF_ttyrant_table_setindex(lua_State* L) {
+static int luaF_table_setindex(lua_State* L) {
 
     // db
     TCRDB* db = _self_tdb(L);
@@ -914,7 +931,12 @@ static int luaF_ttyrant_table_setindex(lua_State* L) {
  *
  * <object> = ttyrant.query:new()
  */
-static int luaF_ttyrant_query_new(lua_State* L) {
+static int _luaF_query_gc(lua_State* L) {
+    RDBQRY* qry = _self_qry(L);
+    tcrdbqrydel(qry);
+    return 0;
+}
+static int luaF_query_new(lua_State* L) {
 
     // instance
     if (!lua_istable(L, 1)) {
@@ -926,6 +948,8 @@ static int luaF_ttyrant_query_new(lua_State* L) {
     // metatable
     lua_pushvalue(L, 1);
     lua_setfield(L, 1, "__index");      // self.__index = self
+    lua_pushcfunction(L, _luaF_query_gc);
+    lua_setfield(L, 1, "__gc");         // self.__gc = _luaF_query_gc
     lua_pushvalue(L, 1);
     lua_setmetatable(L, 3);             // setmetatable(instance, self)
 
@@ -943,19 +967,9 @@ static int luaF_ttyrant_query_new(lua_State* L) {
 }
 
 /*
- * Destroy a query object.
- *
- * <boolean> = ttyrant.query:delete()
+ * Depreciated query destroyer.
  */
-static int luaF_ttyrant_query_delete(lua_State* L) {
-
-    // instance
-    RDBQRY* qry = _self_qry(L);
-
-    // release
-    tcrdbqrydel(qry);
-
-    // ready
+static int luaF_query_delete(lua_State* L) {
     lua_pushboolean(L, 1);
     return 1;
 }
@@ -963,15 +977,17 @@ static int luaF_ttyrant_query_delete(lua_State* L) {
 /*
  * Add a filtering rule to a query object.
  *
- * <boolean> = ttyrant.query:addcond(column, operator, expression)
+ * <boolean> = ttyrant.query:addcond(column, operator, expression[, negate = false[, noidx = false]])
  */
-static int luaF_ttyrant_query_addcond(lua_State* L) {
+static int luaF_query_addcond(lua_State* L) {
 
     // instance
     RDBQRY* qry = _self_qry(L);
 
     // column
     const char* column = luaL_checkstring(L, 2);
+    int options = (lua_toboolean(L, 5) ? RDBQCNEGATE : 0) |
+                  (lua_toboolean(L, 5) ? RDBQCNOIDX : 0);
 
     // nominal indicator table
     static const char* const operator_names[] = {
@@ -994,8 +1010,6 @@ static int luaF_ttyrant_query_addcond(lua_State* L) {
         "FTSAND",
         "FTSOR",
         "FTSEX",
-        "NEGATE",
-        "NOIDX",
         NULL
     };
 
@@ -1020,8 +1034,6 @@ static int luaF_ttyrant_query_addcond(lua_State* L) {
         RDBQCFTSAND,
         RDBQCFTSOR,
         RDBQCFTSEX,
-        RDBQCNEGATE,
-        RDBQCNOIDX,
         0
     };
 
@@ -1053,7 +1065,7 @@ static int luaF_ttyrant_query_addcond(lua_State* L) {
 
     // execute
     if (expression) {
-        tcrdbqryaddcond(qry, column, operator_values[operator], expression);
+        tcrdbqryaddcond(qry, column, operator_values[operator] | options, expression);
     }
 
     // ready
@@ -1064,15 +1076,18 @@ static int luaF_ttyrant_query_addcond(lua_State* L) {
 /*
  * Limit the query result set.
  *
- * <boolean> = ttyrant.query:setlimit(limit[, offset])
+ * <boolean> = ttyrant.query:setlimit([limit = -1[, offset = 0]])
  */
-static int luaF_ttyrant_query_setlimit(lua_State* L) {
+static int luaF_query_setlimit(lua_State* L) {
 
     // instance
     RDBQRY* qry = _self_qry(L);
 
     // limits
-    int limit = luaL_checkint(L, 2);
+    int limit = -1;
+    if (!lua_isnoneornil(L, 2)) {
+        limit = luaL_checkint(L, 2);
+    }
     int offset = lua_tointeger(L, 3);
 
     // apply
@@ -1086,9 +1101,9 @@ static int luaF_ttyrant_query_setlimit(lua_State* L) {
 /*
  * Choose a search ordering.
  *
- * <boolean> = ttyrant.query:setorder(column, method)
+ * <boolean> = ttyrant.query:setorder(column[, method = "STRASC"])
  */
-static int luaF_ttyrant_query_setorder(lua_State* L) {
+static int luaF_query_setorder(lua_State* L) {
 
     // instance
     RDBQRY* qry = _self_qry(L);
@@ -1115,18 +1130,21 @@ static int luaF_ttyrant_query_setorder(lua_State* L) {
     };
 
     // extract indicator
-    const char* method = luaL_checkstring(L, 3);
-    char* p = (char*)method - 1;
-    while (*(++p)) if (islower(*p)) *p = toupper(*p);
-    if (strstr(method, "RDBQO") == method) {
-        method += 5; // strlen("RDBQO") == 5
+    int sort = 0;
+    if (!lua_isnoneornil(L, 3)) {
+        const char* method = luaL_checkstring(L, 3);
+        char* p = (char*)method - 1;
+        while (*(++p)) if (islower(*p)) *p = toupper(*p);
+        if (strstr(method, "RDBQO") == method) {
+            method += 5; // strlen("RDBQO") == 5
+        }
+
+        // extract method
+        lua_pushstring(L, method);
+        sort = luaL_checkoption(L, -1, NULL, method_names);
+        lua_pop(L, 1);
     }
-
-    // extract method
-    lua_pushstring(L, method);
-    int sort = luaL_checkoption(L, -1, NULL, method_names);
-    lua_pop(L, 1);
-
+    
     // execute
     tcrdbqrysetorder(qry, column, method_values[sort]);
 
@@ -1140,7 +1158,7 @@ static int luaF_ttyrant_query_setorder(lua_State* L) {
  *
  * <table> = ttyrant.query:search()
  */
-static int luaF_ttyrant_query_search(lua_State* L) {
+static int luaF_query_search(lua_State* L) {
 
     // instance
     RDBQRY* qry = _self_qry(L);
@@ -1159,7 +1177,7 @@ static int luaF_ttyrant_query_search(lua_State* L) {
  *
  * <table> = ttyrant.query:search_out()
  */
-static int luaF_ttyrant_query_search_out(lua_State* L) {
+static int luaF_query_searchout(lua_State* L) {
 
     // instance
     RDBQRY* qry = _self_qry(L);
@@ -1176,7 +1194,7 @@ static int luaF_ttyrant_query_search_out(lua_State* L) {
  *
  * <table> = ttyrant.query:search_get()
  */
-static int luaF_ttyrant_query_search_get(lua_State* L) {
+static int luaF_query_searchget(lua_State* L) {
 
     // instance
     RDBQRY* qry = _self_qry(L);
@@ -1221,7 +1239,7 @@ static int luaF_ttyrant_query_search_get(lua_State* L) {
  *
  * <table> = ttyrant.query:search_count()
  */
-static int luaF_ttyrant_query_search_count(lua_State* L) {
+static int luaF_query_searchcount(lua_State* L) {
 
     // instance
     RDBQRY* qry = _self_qry(L);
@@ -1236,30 +1254,27 @@ static int luaF_ttyrant_query_search_count(lua_State* L) {
 /*----------------------------------------------------------------------------------------------------------*/
 
 /*
- * Setup defaults.
- */
-#define _defaults(L)  { lua_pushstring(L, "localhost"); \
-                        lua_setfield(L, -2, "host"); \
-                        lua_pushinteger(L, 1978); \
-                        lua_setfield(L, -2, "port"); }
-
-/*
  * Entry point.
  */
 int luaopen_ttyrant(lua_State* L) {
 
-    // rdb registry
+    // base registry
     static const luaL_Reg ttyrant[] = {
-        { "open",           luaF_ttyrant_open },
-        { "close",          luaF_ttyrant_close },
-        { "increment",      luaF_ttyrant_increment },
-        { "put",            luaF_ttyrant_put },
-        { "putcat",         luaF_ttyrant_putcat },
-        { "putkeep",        luaF_ttyrant_putkeep },
-        { "putshl",         luaF_ttyrant_putshl },
-        { "putnr",          luaF_ttyrant_putnr },
-        { "get",            luaF_ttyrant_get },
-        { "vsiz",           luaF_ttyrant_vsiz },
+        { NULL, NULL }
+    };
+    
+    // rdb registry
+    static const luaL_Reg ttyrant_hash[] = {
+        { "open",           luaF_hash_open },
+        { "close",          luaF_any_close },
+        { "increment",      luaF_any_increment },
+        { "put",            luaF_hash_put },
+        { "putcat",         luaF_hash_putcat },
+        { "putkeep",        luaF_hash_putkeep },
+        { "putshl",         luaF_hash_putshl },
+        { "putnr",          luaF_hash_putnr },
+        { "get",            luaF_hash_get },
+        { "vsiz",           luaF_hash_vsiz },
         { "out",            luaF_any_out },
         { "vanish",         luaF_any_vanish },
         { "sync",           luaF_any_sync },
@@ -1267,20 +1282,22 @@ int luaopen_ttyrant(lua_State* L) {
         { "size",           luaF_any_size },
         { "copy",           luaF_any_copy },
         { "stat",           luaF_any_stat },
-        { "keys",           luaF_any_keys },
+        { "keys",           luaF_any_iterator },        // depreciated
+        { "iterator",       luaF_any_iterator },
+        { "fwmkeys",        luaF_any_fwmkeys },
         { NULL, NULL }
     };
 
     // table registry
     static const luaL_Reg ttyrant_table[] = {
-        { "open",           luaF_ttyrant_table_open },
-        { "close",          luaF_ttyrant_table_close },
-        { "increment",      luaF_ttyrant_table_increment },
-        { "put",            luaF_ttyrant_table_put },
-        { "putcat",         luaF_ttyrant_table_putcat },
-        { "putkeep",        luaF_ttyrant_table_putkeep },
-        { "get",            luaF_ttyrant_table_get },
-        { "setindex",       luaF_ttyrant_table_setindex },
+        { "open",           luaF_table_open },
+        { "close",          luaF_any_close },
+        { "increment",      luaF_any_increment },
+        { "put",            luaF_table_put },
+        { "putcat",         luaF_table_putcat },
+        { "putkeep",        luaF_table_putkeep },
+        { "get",            luaF_table_get },
+        { "setindex",       luaF_table_setindex },
         { "out",            luaF_any_out },
         { "vanish",         luaF_any_vanish },
         { "sync",           luaF_any_sync },
@@ -1288,29 +1305,35 @@ int luaopen_ttyrant(lua_State* L) {
         { "size",           luaF_any_size },
         { "copy",           luaF_any_copy },
         { "stat",           luaF_any_stat },
-        { "keys",           luaF_any_keys },
+        { "keys",           luaF_any_iterator },        // depreciated
+        { "iterator",       luaF_any_iterator },
+        { "fwmkeys",        luaF_any_fwmkeys },
         { NULL, NULL }
     };
 
     // query registry
     static const luaL_Reg ttyrant_query[] = {
-        { "new",            luaF_ttyrant_query_new },
-        { "delete",         luaF_ttyrant_query_delete },
-        { "addcond",        luaF_ttyrant_query_addcond },
-        { "setlimit",       luaF_ttyrant_query_setlimit },
-        { "setorder",       luaF_ttyrant_query_setorder },
-        { "search",         luaF_ttyrant_query_search },
-        { "search_get",     luaF_ttyrant_query_search_get },
-        { "search_out",     luaF_ttyrant_query_search_out },
-        { "search_count",   luaF_ttyrant_query_search_count },
+        { "new",            luaF_query_new },
+        { "delete",         luaF_query_delete },        // depreciated
+        { "addcond",        luaF_query_addcond },
+        { "setlimit",       luaF_query_setlimit },
+        { "setorder",       luaF_query_setorder },
+        { "search",         luaF_query_search },
+        { "search_get",     luaF_query_searchget },     // depreciated
+        { "search_out",     luaF_query_searchout },     // depreciated
+        { "search_count",   luaF_query_searchcount },   // depreciated
+        { "searchget",      luaF_query_searchget },
+        { "searchout",      luaF_query_searchout },
+        { "searchcount",    luaF_query_searchcount },
         { NULL, NULL }
     };
 
     // publish
     luaL_register(L, "ttyrant", ttyrant);
-    _defaults(L);
+    luaL_register(L, "ttyrant", ttyrant_hash);          // depreciated
+    luaL_register(L, "ttyrant.hash", ttyrant_hash);
+    lua_pop(L, 1);
     luaL_register(L, "ttyrant.table", ttyrant_table);
-    _defaults(L);
     lua_pop(L, 1);
     luaL_register(L, "ttyrant.query", ttyrant_query);
     lua_pop(L, 1);

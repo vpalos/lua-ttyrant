@@ -35,7 +35,7 @@ end
 --
 
 -- ttyrant:open()
-local th = assert(ttyrant:open{ host ='localhost', port = 1978 })
+local th = assert(ttyrant.hash:open('localhost', 1978))
 
 -- ttyrant:vanish()
 assert(th:vanish())
@@ -150,7 +150,19 @@ local keys = {
     ["saint5"] = true,
     ["Key1"] = true
 }
-for key in th:keys() do
+for key in th:iterator() do
+    assert(keys[key] ~= nil)
+    keys[key] = nil
+end
+
+-- ttyrant:fwmkeys()
+local keys = {
+    ["saint2"] = true,
+    ["saint3"] = true,
+    ["saint5"] = true,
+}
+local test = th:fwmkeys("saint", 4)
+for _, key in ipairs(test) do
     assert(keys[key] ~= nil)
     keys[key] = nil
 end
@@ -164,7 +176,7 @@ assert(th:close())
 --
 
 -- ttyrant.table:open()
-local tt = assert(ttyrant.table:open{ host ='localhost', port = 1979 })
+local tt = assert(ttyrant.table:open('localhost:1979'))
 
 -- ttyrant.table:vanish()
 assert(tt:vanish())
@@ -223,6 +235,36 @@ assert(tt:setindex("a", "decimal"))
 assert(tt:setindex("a", "decimal", false))
 assert(not tt:setindex("a", "decimal", true))
 
+-- ttyrant:keys()
+assert(tt:put('abc1', { a = 11.23, b = 41.56, c = 71.89 }))
+assert(tt:put('abc2', { a = 12.23, b = 42.56, c = 72.89 }))
+assert(tt:put('abc3', { a = 13.23, b = 43.56, c = 73.89 }))
+assert(tt:put('abc4', { a = 14.23, b = 44.56, c = 74.89 }))
+local keys = {
+    ["abc"] = true,
+    ["abc1"] = true,
+    ["abc2"] = true,
+    ["abc3"] = true,
+    ["abc4"] = true,
+}
+for key in tt:iterator() do
+    assert(keys[key] ~= nil)
+    keys[key] = nil
+end
+
+-- ttyrant:fwmkeys()
+local keys = {
+    ["abc"] = true,
+    ["abc1"] = true,
+    ["abc2"] = true,
+}
+local test = th:fwmkeys("abc", 3)
+for _, key in ipairs(test) do
+    assert(keys[key] ~= nil)
+    keys[key] = nil
+end
+
+
 -- leaving table db open for query tests...
 
 
@@ -234,8 +276,8 @@ assert(not tt:setindex("a", "decimal", true))
 local qr = assert(ttyrant.query:new(tt))
 
 -- ttyrant.query:addcond()
-assert(qr:addcond('b', 'numge', '4.56')) -- official rule naming convention
-assert(qr:addcond('c', 'NumLt', '7.90'))      -- without 'RDBQC' prefix, case-insensitive
+assert(qr:addcond('b', 'RDBQCNUMGE', '4.56'))   -- official rule name
+assert(qr:addcond('c', 'numlt', '7.90'))        -- without 'RDBQC' prefix, case-insensitive
 
 -- ttyrant.query:search()
 local result = assert(qr:search())
@@ -262,20 +304,20 @@ assert(result[2] == 'student3')
 assert(result[3] == 'student5')
 assert(qr:delete())
 
--- ttyrant.query:search_get()
--- ttyrant.query:search_out()
--- ttyrant.query:search_count()
+-- ttyrant.query:searchget()
+-- ttyrant.query:searchout()
+-- ttyrant.query:searchcount()
 local qr = assert(ttyrant.query:new(tt))
 assert(qr:addcond('grade', 'numeq', '43.7'))
-local result = assert(qr:search_get())
+local result = assert(qr:searchget())
 assert(result['student5']['flowers'] == 'roses')
-assert(qr:search_count() == 1);
-assert(qr:search_out());
-assert(qr:search_count() == 0);
+assert(qr:searchcount() == 1);
+assert(qr:searchout());
+assert(qr:searchcount() == 0);
 assert(qr:delete())
 
 -- ttyrant.table:rnum()
-assert(tt:rnum() == 5)
+assert(tt:rnum() == 9)
 
 -- ttyrant.table:size()
 assert(tt:size() > 0)

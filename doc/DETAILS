@@ -99,7 +99,9 @@
 
 --- Status ---------------------------------------------------------------------------------------------------
 
-    The library is *almost* complete meaning that there are several functions which are not yet implemented;
+    The library is *almost* complete meaning that there are several functions which are not yet implemented
+    (i.e. the ones marked with *** TODO *** in the correlation listing below).
+    
     The library is to be considered in *beta* state, though it is already quite stable, being actually used 
     in production environments for more than a year. If you require some (or all) of the functions below that
     are not yet implemented, please either contribute some code or *ask* me to do it and I'll try to oblige.
@@ -107,18 +109,6 @@
     Also unfortunately I had no time *yet* to write a documentation; for now just skim over the statements
     in test.lua for usage examples (they should be self-explanatory). You may also check the TokyoTyrant help
     (http://fallabs.com/tokyotyrant/spex.html).
-
-    Functions not yet supported (they are removed from this list as they are implemented):
-
-    - tcrdbrestore()
-    - tcrdbget3()
-    - tcrdboptimize()
-    - tcrdbsetmst()/tcrdbsetmst2()
-    - tcrdbtblgenuid()
-    - tcrdbqryhint()
-    - tcrdbmetasearch()
-    - tcrdbparasearch()
-    - tcrdbext()
 
 --- Correlation ----------------------------------------------------------------------------------------------
 

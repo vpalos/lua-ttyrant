@@ -29,6 +29,8 @@ build = {
     type = "builtin",
     modules = {
         ttyrant = {
+            incdirs = { "$(LIBTOKYOTYRANT_INCDIR)" },
+            libdirs = { "$(LIBTOKYOTYRANT_LIBDIR)" },
             sources = { "src/ttyrant.c" },
             libraries = { "tokyotyrant" }
         }

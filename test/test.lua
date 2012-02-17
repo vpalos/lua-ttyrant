@@ -2,10 +2,10 @@
 
 
 --
--- ttyrant-test.lua: A test-set for lua-ttyrant binding.
+-- A test-set for Lua-TTyrant.
 --
 -- Copyright (C)2010 by Valeriu Palos. All rights reserved.
--- This library is under the BSD license (see README file).
+-- This library is under the MIT license (see doc/LICENSE).
 --
 
 
@@ -16,11 +16,32 @@ local ttyrant = require'ttyrant'
 
 
 --
+-- Assertion wrapper.
+--
+local _assert = assert
+local _testno = 1
+local assert = function(...)
+    io.stdout:write(("Test %d: "):format(_testno))
+    io.stdout:flush()
+    local result = _assert(...)
+    _testno = _testno + 1
+    print("ok.")
+    return result
+end
+
+
+--
 -- Hash database tests.
 --
 
 -- ttyrant:open()
 local th = assert(ttyrant:open{ host ='localhost', port = 1978 })
+
+-- ttyrant:vanish()
+assert(th:vanish())
+
+-- ttyrant:sync()
+assert(th:sync())
 
 -- ttyrant:put()
 assert(th:put('Key1', 'NIKA'))
@@ -31,12 +52,23 @@ assert(th:put{ martyr1 = 'Valeriu Gafencu',
                martyr2 = 'Radu Gyr',
                martyr3 = 'Virgil Maxim',
                martyr4 = 'Vasile Militaru',
-               martyr5 = 'Costache Oprişan',
-               martyr6 = 'Ioan Ianolide',
-               martyr7 = 'Corneliu Zelea' })
+               martyr5 = 'Costache Oprişan' })
 
--- ttyrant:append()
-assert(th:append('martyr7', ' Codreanu'))
+-- ttyrant:putnr()
+assert(th:putnr('martyr6', 'Ianolide Ioan'))
+
+-- ttyrant:putkeep()
+assert(th:putkeep('martyr7', 'Corneliu Zelea'))
+assert(not th:putkeep('martyr7', 'Corneliu Zelea Codreanu'))
+
+-- ttyrant:putcat()
+assert(th:putcat('martyr7', ' Codreanu'))
+
+-- ttyrant:putshl()
+assert(th:putshl('martyr6', ' Ianolide', 13))
+
+-- ttyrant:vsiz()
+assert(th:vsiz('martyr6', 13))
 
 -- ttyrant:put() - multiple keys at once given as list
 assert(th:put( 'saint1', 'Gheorghe',
@@ -76,22 +108,52 @@ assert(th:out('Key1'))
 assert(not th:get('Key1'))
 
 -- ttyrant:out() - multiple keys at once given as table
-assert(th:out{ 'saint1', 'saint4', 'martyr6' })
+assert(th:out{ 'saint1', 'saint4', 'martyr6', 'martyr7' })
 assert(not th:get('saint1'))
 assert(not th:get('saint4'))
 assert(not th:get('martyr6'))
+assert(not th:get('martyr7'))
 
 -- ttyrant:out() - multiple keys at once given as list
-assert(th:out('martyr1', 'martyr4', 'saint6'))
+assert(th:out('martyr1', 'martyr4', 'saint6', 'saint7'))
 assert(not th:get('martyr1'))
 assert(not th:get('martyr4'))
 assert(not th:get('saint6'))
+assert(not th:get('saint7'))
 
 -- ttyrant:increment()
 assert(th:increment('Key1',  3) == 3)
 assert(th:increment('Key1',  3) == 6)
 assert(th:increment('Key1', -1) == 5)
 assert(th:increment('Key1',  3) == 8)
+
+-- ttyrant:rnum()
+assert(th:rnum() == 8)
+
+-- ttyrant:stat()
+assert(tonumber(th:stat()['rnum']) == 8)
+
+-- ttyrant:size()
+assert(th:size() > 0)
+
+-- ttyrant:copy()
+assert(th:copy("/tmp/test.tch-backup"))
+
+-- ttyrant:keys()
+local keys = {
+    ["Key2"] = true,
+    ["martyr2"] = true,
+    ["martyr5"] = true,
+    ["martyr3"] = true,
+    ["saint2"] = true,
+    ["saint3"] = true,
+    ["saint5"] = true,
+    ["Key1"] = true
+}
+for key in th:keys() do
+    assert(keys[key] ~= nil)
+    keys[key] = nil
+end
 
 -- ttyrant:close()
 assert(th:close())
@@ -104,11 +166,26 @@ assert(th:close())
 -- ttyrant.table:open()
 local tt = assert(ttyrant.table:open{ host ='localhost', port = 1979 })
 
+-- ttyrant.table:vanish()
+assert(tt:vanish())
+
+-- ttyrant.table:sync()
+assert(tt:sync())
+
 -- ttyrant.table:put()
 assert(tt:put('abc', { a = 1.23, b = 4.56, c = 7.89 }))
-assert(tt:append('abc', { d = 9.10 }))
-assert(tt:put('123', { [1] = 1.11, [2] = 2.22, [3] = 3.33 }))
-assert(tt:append('123', { [4] = 4.44 }))
+assert(tt:put('abc1', { a = 11.23, b = 41.56, c = 71.89 }))
+assert(tt:put('abc2', { a = 12.23, b = 42.56, c = 72.89 }))
+assert(tt:put('abc3', { a = 13.23, b = 43.56, c = 73.89 }))
+assert(tt:put('abc4', { a = 14.23, b = 44.56, c = 74.89 }))
+
+-- ttyrant.table:putkeep()
+assert(tt:putkeep('123', { [1] = 1.11, [2] = 2.22, [3] = 3.33 }))
+assert(not tt:putkeep('123', { "---" }))
+
+-- ttyrant.table:putcat()
+assert(tt:putcat('abc', { d = 9.10 }))
+assert(tt:putcat('123', { [4] = 4.44 }))
 
 -- ttyrant.table:get()
 local vabc = assert(tt:get('abc'))
@@ -122,11 +199,31 @@ assert(tonumber(v123['4']) == 4.44)
 assert(tt:out('123'))
 assert(not tt:get('123'))
 
+-- ttyrant.table:out() - multiple keys at once given as table
+assert(tt:out{'abc1', 'abc2'})
+assert(not tt:get('abc1'))
+assert(not tt:get('abc2'))
+
+-- ttyrant.table:out() - multiple keys at once given as list
+assert(tt:out('abc3', 'abc4'))
+assert(not tt:get('abc3'))
+assert(not tt:get('abc4'))
+
 -- ttyrant.table:increment()
 assert(tt:increment('abc',  3) == 3)
 assert(tt:increment('abc',  3) == 6)
 assert(tt:increment('abc', -1) == 5)
 assert(tt:increment('abc',  3) == 8)
+
+-- ttyrant.table:copy()
+assert(tt:copy("/tmp/test.tct-backup"))
+
+-- ttyrant.table:setindex()
+assert(tt:setindex("a", "decimal"))
+assert(tt:setindex("a", "decimal", false))
+assert(not tt:setindex("a", "decimal", true))
+
+-- leaving table db open for query tests...
 
 
 --
@@ -136,9 +233,9 @@ assert(tt:increment('abc',  3) == 8)
 -- ttyrant.query:new()
 local qr = assert(ttyrant.query:new(tt))
 
--- ttyrant.query:filter()
-assert(qr:filter('b', 'RDBQCNUMGE', '4.56')) -- official rule naming convention
-assert(qr:filter('c', 'NumLt', '7.90'))      -- without 'RDBQC' prefix, case-insensitive
+-- ttyrant.query:addcond()
+assert(qr:addcond('b', 'numge', '4.56')) -- official rule naming convention
+assert(qr:addcond('c', 'NumLt', '7.90'))      -- without 'RDBQC' prefix, case-insensitive
 
 -- ttyrant.query:search()
 local result = assert(qr:search())
@@ -155,9 +252,9 @@ assert(tt:put('student3', { grade = '100' }))
 assert(tt:put('student4', { grade = '999' }))
 assert(tt:put('student5', { grade = '43.7', flowers = 'roses' }))
 local qr = assert(ttyrant.query:new(tt))
-assert(qr:filter('grade', 'numge', '0'))
-assert(qr:limit(3))
-assert(qr:order('grade', 'numdesc'))
+assert(qr:addcond('grade', 'numge', '0'))
+assert(qr:setlimit(3))
+assert(qr:setorder('grade', 'numdesc'))
 local result = assert(qr:search())
 assert(#result == 3)
 assert(result[1] == 'student4')
@@ -169,13 +266,22 @@ assert(qr:delete())
 -- ttyrant.query:search_out()
 -- ttyrant.query:search_count()
 local qr = assert(ttyrant.query:new(tt))
-assert(qr:filter('grade', 'numeq', '43.7'))
+assert(qr:addcond('grade', 'numeq', '43.7'))
 local result = assert(qr:search_get())
 assert(result['student5']['flowers'] == 'roses')
 assert(qr:search_count() == 1);
 assert(qr:search_out());
 assert(qr:search_count() == 0);
 assert(qr:delete())
+
+-- ttyrant.table:rnum()
+assert(tt:rnum() == 5)
+
+-- ttyrant.table:size()
+assert(tt:size() > 0)
+
+-- ttyrant.table:close()
+assert(tt:close())
 
 
 --

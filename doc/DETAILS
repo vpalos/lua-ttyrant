@@ -1,0 +1,101 @@
+--- Project --------------------------------------------------------------------------------------------------
+
+    Lua-TTyrant
+
+    TokyoTyrant API for Lua.
+    Copyright (C)2010 by Valeriu Palos. All rights reserved.
+    This library is under the MIT license (read doc/README).
+
+--- Description ----------------------------------------------------------------------------------------------
+
+    Lua-ttyrant is a binding to the C API of the TokyoTyrant server (visit http://fallabs.com/) for the Lua
+    programming language. I have seen several attempts on the net to build a TokyoTyrant library straight in
+    Lua (implementing the tyrant/memcache protocol) but I feel that is an unnatural approach since Lua was
+    especially designed to work *with* C and not to avoid it. Further more, by using the actual TokyoTyrant C
+    API library this implementation is less likely to produce protocol errors or inconsistencies.
+
+    The goal of lua-ttyrant is to be a stable, binary-safe and complete binding of the TokyoTyrant C API
+    for both Lua and LuaJIT. At the time of this writing TokyoTyrant 1.1.47 was used as the reference API.
+
+--- Prerequisites --------------------------------------------------------------------------------------------
+
+    To compile lua-ttyrant you will need the following progams compiled/installed on your system:
+
+    1. GCC
+    2. TokyoTyrant
+    3. lua 5.1
+    4. luarocks
+
+    On Debian/Ubuntu-based systems you can install all of these by issuing the following command:
+
+       $ sudo apt-get install build-essential libtokyotyrant-dev lua5.1 liblua5.1-0-dev luarocks
+
+--- Install/Test ---------------------------------------------------------------------------------------------
+
+    To install this library use the excellent luarocks system.
+
+    $ luarocks lua-ttyrant
+
+    To run the set of tests you will first have to start two instances of ttserver: one for a regular (hash)
+    database (on port 1978) and another for a table database (on port 1979), then run the test.lua script:
+
+    $ ttserver -port 1978 /tmp/test.tch &
+    $ ttserver -port 1979 /tmp/test.tct &
+    $ lua test/test.lua
+
+    At the end you can stop the tyrant instances and delete the generated files like this:
+
+    $ killall ttserver
+    $ rm -rf /tmp/test.*
+
+--- Documentation --------------------------------------------------------------------------------------------
+
+    The lua-ttyrant library is a *binding* which means that it actually "transports" the functions provided
+    by the original C API into the Lua language. Therefore you only need to consult two resources in order to
+    use it:
+
+    1. The TokyoTyrant API reference (http://fallabs.com/tokyotyrant/spex.html).
+    2. The 'ttyrant-test.lua' file which contains test cases for every implemented API function.
+
+    There are however, as the tests show, a few differences from the original API. These are outlined below:
+
+    --> The functions tcrdbecode() and tcrdberrmsg() are not present in the binding; instead all functions
+        that can fail, will return <nil, 'error string'> on failure (as is the usual for Lua).
+
+    --> The functionality usually provided in C by the tcrdbmisc() function (i.e. bulk operations) is merged
+        straight in the get(), put() and out() methods of the ttyrant class, all of which can act on a whole
+        set of keys/values, given as a table or a list (see the test cases for examples).
+
+    --> The function variants ending in '2' (for strings) make no sense in Lua since the values are always
+        implicitly converted into strings.
+
+    --> Since Lua make no difference between integers and doubles, the functions tcrdbaddint() and
+        tcrdbadddouble() are merged into the function(s) ttyrant:increment() and ttyrant.table:increment().
+
+    --> Some functions were only used internally (e.g. tcrdbqryrescols()) since they have no meaning for Lua.
+
+--- Status ---------------------------------------------------------------------------------------------------
+
+    The library is *almost* complete meaning that there are several functions which are not yet implemented;
+    The library is to be considered in *beta* state, though it is already quite stable, being actually used 
+    in production environments for more than a year. If you require some (or all) of the functions below that
+    are not yet implemented, please either contribute some code or *ask* me to do it and I try and oblige.
+    
+    Also unfortunately I had no time *yet* for some documentation; for now just skim over the statements in
+    test.lua for usage examples (they shoudl be self-explanatory). You may also check the TokyoTyrant help
+    (http://fallabs.com/tokyotyrant/spex.html).
+
+    Functions not yet supported (they are removed from this list as they are implemented):
+
+    - tcrdbfwmkeys()
+    - tcrdbrestore()
+    - tcrdbget3()
+    - tcrdboptimize()
+    - tcrdbsetmst()/tcrdbsetmst2()
+    - tcrdbtblgenuid()
+    - tcrdbqryhint()
+    - tcrdbmetasearch()
+    - tcrdbparasearch()
+    - tcrdbext()
+
+--- End ------------------------------------------------------------------------------------------------------

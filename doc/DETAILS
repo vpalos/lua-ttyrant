@@ -15,7 +15,7 @@
     API library this implementation is less likely to produce protocol errors or inconsistencies.
 
     The goal of lua-ttyrant is to be a stable, binary-safe and complete binding of the TokyoTyrant C API
-    for both Lua and LuaJIT. At the time of this writing TokyoTyrant 1.1.47 was used as the reference API.
+    for both Lua and LuaJIT. At the time of this writing TokyoTyrant 1.1.41 was used as the reference API.
 
 --- Prerequisites --------------------------------------------------------------------------------------------
 
@@ -41,7 +41,7 @@
     
     $ git clone https://github.com/valeriupalos/lua-ttyrant
     $ cd lua-ttyrant
-    $ sudo luarocks make
+    $ luarocks make
     
     If you want to install it system-wide just run the last command as root (i.e. sudo luarocks make).
 
@@ -91,7 +91,7 @@
     are not yet implemented, please either contribute some code or *ask* me to do it and I try and oblige.
     
     Also unfortunately I had no time *yet* for some documentation; for now just skim over the statements in
-    test.lua for usage examples (they shoudl be self-explanatory). You may also check the TokyoTyrant help
+    test.lua for usage examples (they should be self-explanatory). You may also check the TokyoTyrant help
     (http://fallabs.com/tokyotyrant/spex.html).
 
     Functions not yet supported (they are removed from this list as they are implemented):

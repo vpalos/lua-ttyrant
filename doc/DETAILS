@@ -86,14 +86,14 @@
 
     * 2012-02-18:
     
-      - The keys() iterator function is depreciated in favor of iterator().
-      - The ttyrant:open() function has moved in the ttyrant.hash namespace (to match ttyrant.table).
-      - Passing a table of values to the open() functions is now depreciated; use either of:
-          - open("localhost:1978")
-          - open("localhost", 1978)
-      - Query objects are now garbage collected (the delete() method is now a noop).
-      - Query methods search_get, search_out, search_count are depreciated in favor of 
-        searchget, searchout, searchcount.
+  - The keys() iterator function is depreciated in favor of iterator().
+  - The ttyrant:open() function has moved in the ttyrant.hash namespace (to match ttyrant.table).
+  - Passing a table of values to the open() functions is now depreciated; use either of:
+      - open("localhost:1978")
+      - open("localhost", 1978)
+  - Query objects are now garbage collected (the delete() method is now a noop).
+  - Query methods search_get, search_out, search_count are depreciated in favor of 
+    searchget, searchout, searchcount.
         
     For now all changes are backward-compatible (i.e. previous variants still work but are depreciated).
 

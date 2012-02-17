@@ -32,9 +32,18 @@
 
 --- Install/Test ---------------------------------------------------------------------------------------------
 
-    To install this library use the excellent luarocks system.
+    I submitted this rock to the luarocks mailing list for approval, so eventually you would install this
+    like this:
 
-    $ luarocks lua-ttyrant
+    $ luarocks install lua-ttyrant
+    
+    But until it _is_ accepted, you can do this:
+    
+    $ git clone https://github.com/valeriupalos/lua-ttyrant
+    $ cd lua-ttyrant
+    $ sudo luarocks make
+    
+    If you want to install it system-wide just run the last command as root (i.e. sudo luarocks make).
 
     To run the set of tests you will first have to start two instances of ttserver: one for a regular (hash)
     database (on port 1978) and another for a table database (on port 1979), then run the test.lua script:

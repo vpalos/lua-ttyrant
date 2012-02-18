@@ -26,7 +26,7 @@
  * Self-extraction macros.
  */
 #define _self_xyz(L, F, C)  _self(L, 1, "__" #F, "Invalid «self», expected «" C "» instance!")
-#define _self_rdb(L)        (TCRDB*)_self_xyz(L, rdb, "ttyrant")
+#define _self_hdb(L)        (TCRDB*)_self_xyz(L, rdb, "ttyrant")
 #define _self_tdb(L)        (TCRDB*)_self_xyz(L, tdb, "ttyrant.table")
 #define _self_any(L)        (TCRDB*)_self_xyz(L, any, "ttyrant or ttyrant.table")
 #define _self_qry(L)        (RDBQRY*)_self_xyz(L, qry, "ttyrant.query")
@@ -77,43 +77,39 @@ static TCLIST* _lualist2tclist(lua_State* L, int index) {
 
 /*
  * Turn a Lua table found at the 'index' position in the given
- * stack into a TCLIST object as key1, value1, key2... if keys
- * is 1, or as value1, value2... if keys is 0.
+ * stack into a TCLIST object by the following conversion rules:
+ * full == 0: { k1 = v1, v2, v3, k4 = v4, v5, ...}  -->  k1, v2, v3, k4, v5, ...
+ * full == 1: { k1 = v1, v2, v3, k4 = v4, v5, ...}  -->  k1, v1, k4, v4, ...
+ * Keys must be strings to be taken into account!
  */
-static TCLIST* _luatable2tclist(lua_State* L, int index, int keys) {
+static TCLIST* _luatable2tclist(lua_State* L, int index, int full) {
 
     // initialize
-    size_t keysz;
     const char* key;
-    size_t valsz;
+    size_t      keysz;
+    char        skey[64];
+    int         skeysz;
     const char* val;
-    TCLIST* list = tclistnew();
+    size_t      valsz;
+    TCLIST*     list = tclistnew();
 
     // traverse
     lua_pushnil(L);
     while (lua_next(L, index)) {
 
         // key
-        if (keys) {
-            char skey[64];
-            key = NULL;
-            if (lua_type(L, -2) == LUA_TSTRING) {
-                key = luaL_checklstring(L, -2, &keysz);
-            } else {
-                int skeysz = snprintf(skey, 64, "%i", luaL_checkint(L, -2));
-                if (skeysz < 0) {
-                    break;
-                } else {
-                    key = skey;
-                    keysz = skeysz;
-                }
-            }
+        key = NULL;
+        if (lua_type(L, -2) == LUA_TSTRING) {
+            key = lua_tolstring(L, -2, &keysz);
             tclistpush(list, key, keysz);
         }
 
         // value
-        val = luaL_checklstring(L, -1, &valsz);
-        tclistpush(list, val, valsz);
+        if ((lua_type(L, -1) == LUA_TSTRING) && 
+            ((full && key) || (!full && !key))) {
+            val = lua_tolstring(L, -1, &valsz);
+            tclistpush(list, val, valsz);
+        }
         lua_pop(L, 1);
     }
 
@@ -165,11 +161,11 @@ static int _tclist2luatable(lua_State* L, TCLIST* items, int keys) {
 /*
  * Open a database.
  */
-static int _open(lua_State* L, const char* class, const char* __xyz) {
+static int _any_open(lua_State* L, const char* class, const char* __xyz) {
 
     // instance
     if (!lua_istable(L, 1)) {
-        return luaL_error(L, "Invalid «self» for %class:open(), expected «%s»!", class, class);
+        return luaL_error(L, "Invalid «self» for %s:open(), expected «%s»!", class, class);
     } 
     
     // prepare
@@ -224,10 +220,10 @@ static int _open(lua_State* L, const char* class, const char* __xyz) {
 /*
  * Store value at given key in db.
  */
-static int _put(lua_State* L, int kind) {
+static int _hash_put(lua_State* L, int kind) {
    
     // initialize
-    TCRDB*  db = _self_rdb(L);
+    TCRDB*  db = _self_hdb(L);
 
     // extract
     size_t keysz, valuesz;
@@ -599,15 +595,47 @@ static int luaF_any_fwmkeys(lua_State* L) {
     return 1;
 }
 
+/*
+ * Restore a database file from an update log.
+ *
+ * <boolean> = <any>:restore(path, ts[, check])
+ */
+static int luaF_any_restore(lua_State* L) {
+    TCRDB* db = _self_any(L);
+    const char* path = luaL_checkstring(L, 2);
+    uint64_t ts = luaL_checkinteger(L, 3);
+    int check = lua_toboolean(L, 4);
+    if (!tcrdbrestore(db, path, ts, check)) {
+        _failure(L, tcrdberrmsg(tcrdbecode(db)));
+    }
+    lua_pushboolean(L, 1);
+    return 1;
+}
+
+/*
+ * Optimize the storage of a database file.
+ *
+ * <boolean> = <any>:optimize(options)
+ */
+static int luaF_any_optimize(lua_State* L) {
+    TCRDB* db = _self_any(L);
+    if (!tcrdboptimize(db, lua_tostring(L, 2))) {
+        _failure(L, tcrdberrmsg(tcrdbecode(db)));
+    }
+    lua_pushboolean(L, 1);
+    return 1;
+}
+
 /*----------------------------------------------------------------------------------------------------------*/
 
 /*
  * Open a regular database.
  *
- * <object> = ttyrant:open({ host = 'localhost', port = 1978 })
+ * <object> = ttyrant.hash:open('localhost', 1978)
+ * <object> = ttyrant.hash:open('localhost:1978')
  */
 static int luaF_hash_open(lua_State* L) {
-    return _open(L, "ttyrant", "__rdb");
+    return _any_open(L, "ttyrant.hash", "__rdb");
 }
 
 /*
@@ -622,22 +650,18 @@ static int luaF_hash_open(lua_State* L) {
 static int luaF_hash_put(lua_State* L) {
 
     // initialize
-    TCRDB*  db = _self_rdb(L);
+    TCRDB*  db = _self_hdb(L);
     TCLIST* items = NULL;
     int     status = 0;
 
-    // table
+    // input set
     if (lua_istable(L, 2)) {
         items = _luatable2tclist(L, 2, 1);
-
-    // item
     } else if (lua_gettop(L) == 3) {
         size_t keysz, valuesz;
         const char* key = luaL_checklstring(L, 2, &keysz);
         const char* value = luaL_checklstring(L, 3, &valuesz);
         status = tcrdbput(db, key, keysz, value, valuesz);
-
-    // list
     } else {
         items = _lualist2tclist(L, 2);
     }
@@ -668,7 +692,7 @@ static int luaF_hash_put(lua_State* L) {
  * <boolean> = ttyrant:putcat(key, value)
  */
 static int luaF_hash_putcat(lua_State* L) {
-    return _put(L, PUT_CAT);
+    return _hash_put(L, PUT_CAT);
 }
 
 /*
@@ -677,7 +701,7 @@ static int luaF_hash_putcat(lua_State* L) {
  * <boolean> = ttyrant:putkeep(key, value)
  */
 static int luaF_hash_putkeep(lua_State* L) {
-    return _put(L, PUT_KEEP);
+    return _hash_put(L, PUT_KEEP);
 }
 
 /*
@@ -688,7 +712,7 @@ static int luaF_hash_putkeep(lua_State* L) {
 static int luaF_hash_putshl(lua_State* L) {
 
     // initialize
-    TCRDB*  db = _self_rdb(L);
+    TCRDB*  db = _self_hdb(L);
 
     // extract
     size_t keysz, valuesz;
@@ -712,7 +736,7 @@ static int luaF_hash_putshl(lua_State* L) {
  * <boolean> = ttyrant:putnr(key, value)
  */
 static int luaF_hash_putnr(lua_State* L) {
-    return _put(L, PUT_NR);
+    return _hash_put(L, PUT_NR);
 }
 
 /*
@@ -721,10 +745,11 @@ static int luaF_hash_putnr(lua_State* L) {
  * <value> = ttyrant:get(key1, key2, ...)
  * <value> = ttyrant:get{key1, key2, ...}
  */
+ #include <stdio.h>
 static int luaF_hash_get(lua_State* L) {
 
     // initialize
-    TCRDB*  db = _self_rdb(L);
+    TCRDB*  db = _self_hdb(L);
     TCLIST* keys = NULL;
     TCLIST* items = NULL;
     char*   item = NULL;
@@ -770,7 +795,7 @@ static int luaF_hash_get(lua_State* L) {
 static int luaF_hash_vsiz(lua_State* L) {
 
     // initialize
-    TCRDB*  db = _self_rdb(L);
+    TCRDB*  db = _self_hdb(L);
 
     // extract
     size_t keysz;
@@ -792,10 +817,11 @@ static int luaF_hash_vsiz(lua_State* L) {
 /*
  * Open a table database.
  *
- * <object> = ttyrant.table:open({ host = 'localhost', port = 1978 })
+ * <object> = ttyrant.table:open('localhost', 1978)
+ * <object> = ttyrant.table:open('localhost:1978')
  */
 static int luaF_table_open(lua_State* L) {
-    return _open(L, "ttyrant.table", "__tdb");
+    return _any_open(L, "ttyrant.table", "__tdb");
 }
 
 /*
@@ -924,6 +950,26 @@ static int luaF_table_setindex(lua_State* L) {
     return 1;
 }
 
+/*
+ * Generate an unique ID.
+ *
+ * <number> = <table>:genuid()
+ */
+static int luaF_table_genuid(lua_State* L) {
+
+    // extract/execute
+    TCRDB* db = _self_tdb(L);
+    int64_t uid = tcrdbtblgenuid(db);
+    if (uid == -1) {
+        _failure(L, tcrdberrmsg(tcrdbecode(db)));
+    } else {
+        lua_pushinteger(L, uid);
+    }
+    
+    // ready
+    return 1;
+}
+
 /*----------------------------------------------------------------------------------------------------------*/
 
 /*
@@ -932,8 +978,7 @@ static int luaF_table_setindex(lua_State* L) {
  * <object> = ttyrant.query:new()
  */
 static int _luaF_query_gc(lua_State* L) {
-    RDBQRY* qry = _self_qry(L);
-    tcrdbqrydel(qry);
+    tcrdbqrydel(_self_qry(L));
     return 0;
 }
 static int luaF_query_new(lua_State* L) {
@@ -1159,40 +1204,28 @@ static int luaF_query_setorder(lua_State* L) {
  * <table> = ttyrant.query:search()
  */
 static int luaF_query_search(lua_State* L) {
-
-    // instance
     RDBQRY* qry = _self_qry(L);
-
-    // execute
     TCLIST* items = tcrdbqrysearch(qry);
     _tclist2luatable(L, items, 0);
     tclistdel(items);
-
-    // ready
     return 1;
 }
 
 /*
  * Remove all tuples corresponding to the query object.
  *
- * <table> = ttyrant.query:search_out()
+ * <boolean> = ttyrant.query:searchout()
  */
 static int luaF_query_searchout(lua_State* L) {
-
-    // instance
     RDBQRY* qry = _self_qry(L);
-
-    // execute
     lua_pushboolean(L, tcrdbqrysearchout(qry));
-
-    // ready
     return 1;
 }
 
 /*
  * Get the values of tuples which correspond to the query object.
  *
- * <table> = ttyrant.query:search_get()
+ * <table> = ttyrant.query:searchget()
  */
 static int luaF_query_searchget(lua_State* L) {
 
@@ -1237,15 +1270,24 @@ static int luaF_query_searchget(lua_State* L) {
 /*
  * Count the tuples which correspond to the query object.
  *
- * <table> = ttyrant.query:search_count()
+ * <table> = ttyrant.query:searchcount()
  */
 static int luaF_query_searchcount(lua_State* L) {
+    RDBQRY* qry = _self_qry(L);
+    lua_pushinteger(L, tcrdbqrysearchcount(qry));
+    return 1;
+}
 
-    // instance
+/*
+ * Return the query hint string.
+ *
+ * <string> = ttyrant.query:hint()
+ */
+static int luaF_query_hint(lua_State* L) {
     RDBQRY* qry = _self_qry(L);
 
     // execute
-    lua_pushinteger(L, tcrdbqrysearchcount(qry));
+    lua_pushstring(L, tcrdbqryhint(qry));
 
     // ready
     return 1;
@@ -1285,6 +1327,8 @@ int luaopen_ttyrant(lua_State* L) {
         { "keys",           luaF_any_iterator },        // depreciated
         { "iterator",       luaF_any_iterator },
         { "fwmkeys",        luaF_any_fwmkeys },
+        { "restore",        luaF_any_restore },
+        { "optimize",       luaF_any_optimize },
         { NULL, NULL }
     };
 
@@ -1308,6 +1352,9 @@ int luaopen_ttyrant(lua_State* L) {
         { "keys",           luaF_any_iterator },        // depreciated
         { "iterator",       luaF_any_iterator },
         { "fwmkeys",        luaF_any_fwmkeys },
+        { "restore",        luaF_any_restore },
+        { "genuid",         luaF_table_genuid },
+        { "optimize",       luaF_any_optimize },
         { NULL, NULL }
     };
 
@@ -1325,6 +1372,7 @@ int luaopen_ttyrant(lua_State* L) {
         { "searchget",      luaF_query_searchget },
         { "searchout",      luaF_query_searchout },
         { "searchcount",    luaF_query_searchcount },
+        { "hint",           luaF_query_hint },
         { NULL, NULL }
     };
 

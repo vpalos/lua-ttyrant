@@ -56,14 +56,20 @@
     $ killall ttserver
     $ rm -rf /tmp/test.*
 
+--- Bugs -----------------------------------------------------------------------------------------------------
+
+    I *really* like to keep my works bug-free but sometimes that is too much work for just one person. So I
+    ask you to issue a ticket (https://github.com/valeriupalos/lua-ttyrant/issues) when you find any bugs or
+    misfeature or if you simply have a suggestion. Thank you!
+
 --- Documentation --------------------------------------------------------------------------------------------
 
-    The lua-ttyrant library is a *binding* which means that it actually "transports" the functions provided
-    by the original C API into the Lua language. Therefore you only need to consult two resources in order to
-    use it:
+    The lua-ttyrant library is a *binding* which means that it actually "exposes" the functions provided
+    by the original C API into the Lua language. Therefore you only need to consult two resources in order
+    to know how to use it:
 
     1. The TokyoTyrant API reference (http://fallabs.com/tokyotyrant/spex.html).
-    2. The 'ttyrant-test.lua' file which contains test cases for every implemented API function.
+    2. The 'test/test.lua' file which contains test cases for every implemented API function.
 
     There are however, as the tests show, a few differences from the original API. These are outlined below:
 
@@ -77,26 +83,46 @@
     --> The function variants ending in '2' (for strings) make no sense in Lua since the values are always
         implicitly converted into strings.
 
-    --> Since Lua make no difference between integers and doubles, the functions tcrdbaddint() and
-        tcrdbadddouble() are merged into the function(s) ttyrant:increment() and ttyrant.table:increment().
-
-    --> Some functions were only used internally (e.g. tcrdbqryrescols()) since they have no meaning for Lua.
+    --> Since Lua makes no difference between integers and doubles, the functions tcrdbaddint() and
+        tcrdbadddouble() are merged into the function(s) ttyrant:increment() and <table>:increment(). The
+        same goes for tcrdbiterinit() and tcrdbiternext() which are merged into <any>:iterator(). Also, other
+        functions were only used internally (e.g. tcrdbqryrescols()) since they have no meaning for Lua.
 
 --- Changes --------------------------------------------------------------------------------------------------
 
-    * 2012-02-18:
-    
-  - The keys() iterator function is depreciated in favor of iterator().
-  - The ttyrant:open() function has moved in the ttyrant.hash namespace (to match ttyrant.table).
-  - Passing a table of values to the open() functions is now depreciated; use either of:
-      - open("localhost:1978")
-      - open("localhost", 1978)
-  - Query objects are now garbage collected (the delete() method is now a noop).
-  - Query methods search_get, search_out, search_count are depreciated in favor of 
-    searchget, searchout, searchcount.
-        
-    For now all changes are backward-compatible (i.e. previous variants still work but are depreciated).
+    *** 2012-02-18 ***
 
+    - Depreciated <any>:keys()
+      The keys() iterator function is depreciated in favor of iterator().
+      
+    - Depreciated ttyrant:open()
+      The ttyrant:open() function has moved in the ttyrant.hash namespace (to match ttyrant.table).
+      
+    - Depreciated <any>:open({ host = 'localhost', port = 1978 })
+      Passing a table of values to the open() functions is now depreciated; use either of:
+        - open("localhost:1978")
+        - open("localhost", 1978)
+
+    - Depreciated <query>:delete()
+      Query objects are now garbage collected (the delete() method does nothing and is depreciated).
+      
+    - Depreciated <query>:search_*()
+      Query methods search_get, search_out, search_count are depreciated in favor of 
+      searchget, searchout, searchcount (i.e. without the underscores).
+      
+    - Marked tcrdbget3 as implemented since <hash>:get(<table>) alreadyd had the same functionality.
+    
+    - Extended <hash>:get() and <any>:out() to also accept associative tables beside simple arrays.
+      Basically the table's string keys are considered in addition to the values of numeric keys.
+      All the following calls do the exact same thing (the same applies to <any>:out()):
+        - <hash>:get('key1', 'key2')                    -- list
+        - <hash>:get{'key1', 'key2'}                    -- indexed table
+        - <hash>:get{['key1'] = ..., ['key2'] = ...}    -- associative table
+        - <hash>:get{['key1'] = ..., 'key2'}            -- combination
+        
+    - Changed <hash>:put(<table>) to ignore numeric (array index) keys (it is possible that this will break
+      backward-compatibility but unlikely since this was a weird and useless "feature").
+    
 --- Status ---------------------------------------------------------------------------------------------------
 
     The library is *almost* complete meaning that there are several functions which are not yet implemented
@@ -106,127 +132,70 @@
     in production environments for more than a year. If you require some (or all) of the functions below that
     are not yet implemented, please either contribute some code or *ask* me to do it and I'll try to oblige.
     
-    Also unfortunately I had no time *yet* to write a documentation; for now just skim over the statements
+    Also unfortunately I had no time *yet* to write a *real* documentation; for now skim over the statements
     in test.lua for usage examples (they should be self-explanatory). You may also check the TokyoTyrant help
     (http://fallabs.com/tokyotyrant/spex.html).
+    
+    If you *really* need a manual then please yell (https://github.com/valeriupalos/lua-ttyrant/issues).
 
 --- Correlation ----------------------------------------------------------------------------------------------
 
     This is how the original C functions correlate to the Lua functions:
     
-    tcrdberrmsg         - (n/a)
+    tcrdbopen, tcrdbopen2                               - ttyrant.hash:open(),  ttyrant.table:open()
 
-    tcrdbnew            - (n/a)
+    tcrdbclose                                          - <hash>:close(),       <table>:close()
+    tcrdbput, tcrdbput2                                 - <hash>:put()
+    tcrdbputkeep, tcrdbputkeep2                         - <hash>:putkeep()
+    tcrdbputcat, tcrdbputcat2                           - <hash>:putcat()
+    tcrdbputshl, tcrdbputshl2                           - <hash>:putshl()
+    tcrdbputnr, tcrdbputnr2                             - <hash>:putnr()
+    tcrdbout, tcrdbout2                                 - <hash>:putout()
+    tcrdbget, tcrdbget2, tcrdbget3                      - <hash>:get()
+    tcrdbvsiz, tcrdbvsiz2                               - <hash>:vsiz()
+    tcrdbiterinit, tcrdbiternext, tcrdbiternext2        - <hash>:iterator(), <table>:iterator()
+    tcrdbfwmkeys, tcrdbfwmkeys2                         - <hash>:fwmkeys(), <table>:fwmkeys()
+    tcrdbaddint, tcrdbadddouble                         - <hash>:increment(), <table>:increment()
+    tcrdbsync                                           - <hash>:sync(), <table>:sync()
+    tcrdboptimize                                       - <hash>:optimize(), <table>:optimize()
+    tcrdbvanish                                         - <hash>:vanish(), <table>:vanish()
+    tcrdbcopy                                           - <hash>:copy(), <table>:copy()
+    tcrdbrestore                                        - <hash>:restore(), <table>:restore()
+    tcrdbrnum                                           - <hash>:rnum(), <table>:rnum()
+    tcrdbsize                                           - <hash>:size(), <table>:size()
+    tcrdbstat                                           - <hash>:stat(), <table>:stat()
 
-    tcrdbdel            - (n/a)
+    tcrdbtblput                                         - <table>:put()
+    tcrdbtblputkeep                                     - <table>:putkeep()
+    tcrdbtblputcat                                      - <table>:putcat()
+    tcrdbtblout                                         - <table>:out()
+    tcrdbtblget                                         - <table>:get()
+    tcrdbtblsetindex                                    - <table>:setindex()
+    tcrdbtblgenuid                                      - <table>:genuid()
 
-    tcrdbecode          - (n/a)
+    tcrdbqrynew                                         - ttyrant.query:new()
 
-    tcrdbtune           - *** TODO ***
+    tcrdbqryaddcond                                     - <query>:addcond()
+    tcrdbqrysetorder                                    - <query>:setorder()
+    tcrdbqrysetlimit                                    - <query>:setlimit()
+    tcrdbqrysearch                                      - <query>:search()
+    tcrdbqrysearchout                                   - <query>:searchout()
+    tcrdbqrysearchget                                   - <query>:searchget()
+    tcrdbqrysearchcount                                 - <query>:search_count()
+    tcrdbqryhint                                        - <query>:hint()
 
-    tcrdbopen           - ttyrant.hash:open(), ttyrant.table:open()
-    tcrdbopen2
+    tcrdbext, tcrdbext2                                 - *** TODO ***
+    tcrdbtune                                           - *** TODO ***
+    tcrdbsetmst, tcrdbsetmst2                           - *** TODO ***
+    tcrdbmetasearch                                     - *** TODO ***
+    tcrdbparasearch                                     - *** TODO ***
 
-    tcrdbclose          - <hash>:close(), <table>:close()
-
-    tcrdbput            - <hash>:put()
-    tcrdbput2
-
-    tcrdbputkeep        - <hash>:putkeep()
-    tcrdbputkeep2
-
-    tcrdbputcat         - <hash>:putcat()
-    tcrdbputcat2
-
-    tcrdbputshl         - <hash>:putshl()
-    tcrdbputshl2
-
-    tcrdbputnr          - <hash>:putnr()
-    tcrdbputnr2
-
-    tcrdbout            - <hash>:putout()
-    tcrdbout2
-
-    tcrdbget            - <hash>:get()
-    tcrdbget2
-
-    tcrdbget3           - *** TODO ***
-
-    tcrdbvsiz           - <hash>:vsiz()
-    tcrdbvsiz2
-
-    tcrdbiterinit       - <hash>:iterator(), <table>:iterator()
-    tcrdbiternext
-    tcrdbiternext2
-
-    tcrdbfwmkeys        - <hash>:fwmkeys(), <table>:fwmkeys()
-    tcrdbfwmkeys2
-
-    tcrdbaddint         - <hash>:increment(), <table>:increment()
-    tcrdbadddouble
-    
-    tcrdbext            - *** TODO ***
-    tcrdbext2
-    
-    tcrdbsync           - <hash>:sync(), <table>:sync()
-    
-    tcrdboptimize       - *** TODO ***
-
-    tcrdbvanish         - <hash>:vanish(), <table>:vanish()
-
-    tcrdbcopy           - <hash>:copy(), <table>:copy()
-
-    tcrdbrestore        - *** TODO ***
-
-    tcrdbsetmst         - *** TODO ***
-    tcrdbsetmst2
-
-    tcrdbrnum           - <hash>:rnum(), <table>:rnum()
-
-    tcrdbsize           - <hash>:size(), <table>:size()
-
-    tcrdbstat           - <hash>:stat(), <table>:stat()
-
-    tcrdbmisc           - (n/a)
-
-    tcrdbtblput         - <table>:put()
-
-    tcrdbtblputkeep     - <table>:putkeep()
-
-    tcrdbtblputcat      - <table>:putcat()
-
-    tcrdbtblout         - <table>:out()
-
-    tcrdbtblget         - <table>:get()
-
-    tcrdbtblsetindex    - <table>:setindex()
-
-    tcrdbtblgenuid      *** TODO ***
-
-    tcrdbqrynew         - ttyrant.query:new()
-
-    tcrdbqrydel         - (n/a)
-
-    tcrdbqryaddcond     - <query>:addcond()
-
-    tcrdbqrysetorder    - <query>:setorder()
-
-    tcrdbqrysetlimit    - <query>:setlimit()
-
-    tcrdbqrysearch      - <query>:search()
-
-    tcrdbqrysearchout   - <query>:searchout()
-
-    tcrdbqrysearchget   - <query>:searchget()
-
-    tcrdbqryrescols     - (n/a)
-
-    tcrdbqrysearchcount - <query>:search_count()
-
-    tcrdbqryhint        - *** TODO ***
-
-    tcrdbmetasearch     - *** TODO ***
-
-    tcrdbparasearch     - *** TODO ***
+    tcrdberrmsg                                         - (used internally)
+    tcrdbnew                                            - (used internally)
+    tcrdbdel                                            - (used internally)
+    tcrdbecode                                          - (used internally)
+    tcrdbmisc                                           - (used internally)
+    tcrdbqrydel                                         - (used internally)
+    tcrdbqryrescols                                     - (used internally)
 
 --- End ------------------------------------------------------------------------------------------------------

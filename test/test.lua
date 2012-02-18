@@ -12,7 +12,7 @@
 --
 -- Import API.
 --
-local ttyrant = require'ttyrant'
+local ttyrant = require('ttyrant')
 
 
 --
@@ -34,43 +34,45 @@ end
 -- Hash database tests.
 --
 
--- ttyrant:open()
+-- ttyrant.hash:open()
 local th = assert(ttyrant.hash:open('localhost', 1978))
 
--- ttyrant:vanish()
+-- ttyrant.hash:vanish()
 assert(th:vanish())
 
--- ttyrant:sync()
+-- ttyrant.hash:sync()
 assert(th:sync())
 
--- ttyrant:put()
+-- ttyrant.hash:put() - single key-value pair
 assert(th:put('Key1', 'NIKA'))
 assert(th:put('Key2', 'ICXC'))
 
--- ttyrant:put() - multiple keys at once given as table
+-- ttyrant.hash:put() - multiple keys at once given as table
 assert(th:put{ martyr1 = 'Valeriu Gafencu',
                martyr2 = 'Radu Gyr',
                martyr3 = 'Virgil Maxim',
                martyr4 = 'Vasile Militaru',
-               martyr5 = 'Costache Oprişan' })
+               martyr5 = 'Costache Oprişan',
+               'index_1',
+               'index_2' })
 
--- ttyrant:putnr()
+-- ttyrant.hash:putnr()
 assert(th:putnr('martyr6', 'Ianolide Ioan'))
 
--- ttyrant:putkeep()
+-- ttyrant.hash:putkeep()
 assert(th:putkeep('martyr7', 'Corneliu Zelea'))
 assert(not th:putkeep('martyr7', 'Corneliu Zelea Codreanu'))
 
--- ttyrant:putcat()
+-- ttyrant.hash:putcat()
 assert(th:putcat('martyr7', ' Codreanu'))
 
--- ttyrant:putshl()
+-- ttyrant.hash:putshl()
 assert(th:putshl('martyr6', ' Ianolide', 13))
 
--- ttyrant:vsiz()
+-- ttyrant.hash:vsiz()
 assert(th:vsiz('martyr6', 13))
 
--- ttyrant:put() - multiple keys at once given as list
+-- ttyrant.hash:put() - multiple keys at once given as list
 assert(th:put( 'saint1', 'Gheorghe',
                'saint2', 'Anastasia',
                'saint3', 'Dimitrie',
@@ -79,12 +81,20 @@ assert(th:put( 'saint1', 'Gheorghe',
                'saint6', 'Oprea',
                'saint7', 'Ilie Lăcătuşu' ))
 
--- ttyrant:get()
+-- ttyrant.hash:get()
 assert(th:get('Key1') == 'NIKA')
 assert(th:get('Key2') == 'ICXC')
+assert(not th:get('index_1'))
+assert(not th:get('index_2'))
 
--- ttyrant:get() - multiple keys at once given as table
-local vmtr = assert(th:get{ 'martyr1', 'martyr2', 'martyr3', 'martyr4', 'martyr5', 'martyr6', 'martyr7' })
+-- ttyrant.hash:get() - multiple keys at once given as table
+local vmtr = assert(th:get{ ['martyr1'] = 'foo', 
+                            ['martyr2'] = 123,
+                            'martyr3', 
+                            'martyr4', 
+                            'martyr5', 
+                            'martyr6', 
+                            'martyr7' })
 assert(vmtr.martyr1 == 'Valeriu Gafencu')
 assert(vmtr.martyr2 == 'Radu Gyr')
 assert(vmtr.martyr3 == 'Virgil Maxim')
@@ -93,8 +103,15 @@ assert(vmtr.martyr5 == 'Costache Oprişan')
 assert(vmtr.martyr6 == 'Ioan Ianolide')
 assert(vmtr.martyr7 == 'Corneliu Zelea Codreanu')
 
--- ttyrant:get() - multiple keys at once given as list
-local vsnt = assert(th:get('saint1', 'saint2', 'saint3', 'saint4', 'saint5', 'saint6', 'saint7'))
+-- ttyrant.hash:get() - multiple keys at once given as list
+local vsnt = assert(th:get('saint1', 
+                           'saint2', 
+                           'fake1', 
+                           'saint3', 
+                           'saint4', 
+                           'saint5', 
+                           'saint6', 
+                           'saint7'))
 assert(vsnt.saint1 == 'Gheorghe')
 assert(vsnt.saint2 == 'Anastasia')
 assert(vsnt.saint3 == 'Dimitrie')
@@ -102,44 +119,51 @@ assert(vsnt.saint4 == 'Antonie')
 assert(vsnt.saint5 == 'Filofteia')
 assert(vsnt.saint6 == 'Oprea')
 assert(vsnt.saint7 == 'Ilie Lăcătuşu')
+assert(not vsnt.fake_key)
 
--- ttyrant:out()
+-- test tcrdbget3 behaviour
+assert(not vsnt.fake1)
+
+-- ttyrant.hash:out()
 assert(th:out('Key1'))
 assert(not th:get('Key1'))
 
--- ttyrant:out() - multiple keys at once given as table
-assert(th:out{ 'saint1', 'saint4', 'martyr6', 'martyr7' })
+-- ttyrant.hash:out() - multiple keys at once given as table
+assert(th:out{ ['saint1'] = true,
+               ['saint4'] = 321,
+               'martyr6',
+               'martyr7' })
 assert(not th:get('saint1'))
 assert(not th:get('saint4'))
 assert(not th:get('martyr6'))
 assert(not th:get('martyr7'))
 
--- ttyrant:out() - multiple keys at once given as list
+-- ttyrant.hash:out() - multiple keys at once given as list
 assert(th:out('martyr1', 'martyr4', 'saint6', 'saint7'))
 assert(not th:get('martyr1'))
 assert(not th:get('martyr4'))
 assert(not th:get('saint6'))
 assert(not th:get('saint7'))
 
--- ttyrant:increment()
+-- ttyrant.hash:increment()
 assert(th:increment('Key1',  3) == 3)
 assert(th:increment('Key1',  3) == 6)
 assert(th:increment('Key1', -1) == 5)
 assert(th:increment('Key1',  3) == 8)
 
--- ttyrant:rnum()
+-- ttyrant.hash:rnum()
 assert(th:rnum() == 8)
 
--- ttyrant:stat()
+-- ttyrant.hash:stat()
 assert(tonumber(th:stat()['rnum']) == 8)
 
--- ttyrant:size()
+-- ttyrant.hash:size()
 assert(th:size() > 0)
 
--- ttyrant:copy()
+-- ttyrant.hash:copy()
 assert(th:copy("/tmp/test.tch-backup"))
 
--- ttyrant:keys()
+-- ttyrant.hash:keys()
 local keys = {
     ["Key2"] = true,
     ["martyr2"] = true,
@@ -148,14 +172,14 @@ local keys = {
     ["saint2"] = true,
     ["saint3"] = true,
     ["saint5"] = true,
-    ["Key1"] = true
+    ["Key1"] = true,
 }
 for key in th:iterator() do
     assert(keys[key] ~= nil)
     keys[key] = nil
 end
 
--- ttyrant:fwmkeys()
+-- ttyrant.hash:fwmkeys()
 local keys = {
     ["saint2"] = true,
     ["saint3"] = true,
@@ -167,7 +191,10 @@ for _, key in ipairs(test) do
     keys[key] = nil
 end
 
--- ttyrant:close()
+-- ttyrant.hash:optimize()
+assert(th:optimize())
+
+-- ttyrant.hash:close()
 assert(th:close())
 
 
@@ -184,7 +211,7 @@ assert(tt:vanish())
 -- ttyrant.table:sync()
 assert(tt:sync())
 
--- ttyrant.table:put()
+-- ttyrant.table:put() - single key-tuple pairs
 assert(tt:put('abc', { a = 1.23, b = 4.56, c = 7.89 }))
 assert(tt:put('abc1', { a = 11.23, b = 41.56, c = 71.89 }))
 assert(tt:put('abc2', { a = 12.23, b = 42.56, c = 72.89 }))
@@ -235,7 +262,7 @@ assert(tt:setindex("a", "decimal"))
 assert(tt:setindex("a", "decimal", false))
 assert(not tt:setindex("a", "decimal", true))
 
--- ttyrant:keys()
+-- ttyrant.table:iterator()
 assert(tt:put('abc1', { a = 11.23, b = 41.56, c = 71.89 }))
 assert(tt:put('abc2', { a = 12.23, b = 42.56, c = 72.89 }))
 assert(tt:put('abc3', { a = 13.23, b = 43.56, c = 73.89 }))
@@ -252,7 +279,7 @@ for key in tt:iterator() do
     keys[key] = nil
 end
 
--- ttyrant:fwmkeys()
+-- ttyrant.table:fwmkeys()
 local keys = {
     ["abc"] = true,
     ["abc1"] = true,
@@ -264,6 +291,15 @@ for _, key in ipairs(test) do
     keys[key] = nil
 end
 
+-- ttyrant.table:size()
+assert(tt:size() > 0)
+
+-- ttyrant.table:genuid()
+assert(tt:genuid() > 0)
+assert(tt:genuid() < tt:genuid())
+
+-- ttyrant.table:optimize()
+assert(tt:optimize())
 
 -- leaving table db open for query tests...
 
@@ -304,6 +340,9 @@ assert(result[2] == 'student3')
 assert(result[3] == 'student5')
 assert(qr:delete())
 
+-- ttyrant.query:hint()
+assert(string.len(qr:hint()) > 0)
+
 -- ttyrant.query:searchget()
 -- ttyrant.query:searchout()
 -- ttyrant.query:searchcount()
@@ -318,9 +357,6 @@ assert(qr:delete())
 
 -- ttyrant.table:rnum()
 assert(tt:rnum() == 9)
-
--- ttyrant.table:size()
-assert(tt:size() > 0)
 
 -- ttyrant.table:close()
 assert(tt:close())

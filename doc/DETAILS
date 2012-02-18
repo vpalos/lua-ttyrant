@@ -142,9 +142,9 @@
 
     This is how the original C functions correlate to the Lua functions:
     
-    tcrdbopen, tcrdbopen2                               - ttyrant.hash:open(),  ttyrant.table:open()
+    tcrdbopen, tcrdbopen2                               - ttyrant.hash:open(), ttyrant.table:open()
 
-    tcrdbclose                                          - <hash>:close(),       <table>:close()
+    tcrdbclose                                          - <hash>:close(), <table>:close()
     tcrdbput, tcrdbput2                                 - <hash>:put()
     tcrdbputkeep, tcrdbputkeep2                         - <hash>:putkeep()
     tcrdbputcat, tcrdbputcat2                           - <hash>:putcat()

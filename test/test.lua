@@ -20,13 +20,17 @@ local ttyrant = require('ttyrant')
 --
 local _assert = assert
 local _testno = 1
-local assert = function(...)
-    io.stdout:write(("Test %d: "):format(_testno))
+local _passno = 1
+local assert = function(result, ...)
+    io.stdout:write()
     io.stdout:flush()
-    local result = _assert(...)
+    if (not result) then
+        print(debug.traceback(("\nTest %d: FAILED! <--"):format(_testno), 2))
+    else
+        _passno = _passno + 1
+    end
     _testno = _testno + 1
-    print("ok.")
-    return result
+    return result, ...
 end
 
 
@@ -90,6 +94,7 @@ assert(not th:get('index_2'))
 -- ttyrant.hash:get() - multiple keys at once given as table
 local vmtr = assert(th:get{ ['martyr1'] = 'foo', 
                             ['martyr2'] = 123,
+                            [0] = true, -- ignored
                             'martyr3', 
                             'martyr4', 
                             'martyr5', 
@@ -365,4 +370,5 @@ assert(tt:close())
 --
 -- Success.
 --
-print('All tests completed successfully.')
+local _failno = _testno - _passno
+print(("\nTests results: %d total, %d passed, %d failed.\n"):format(_testno, _passno, _failno))

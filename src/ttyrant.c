@@ -312,12 +312,12 @@ static int _table_put(lua_State* L, const char* error, int kind) {
             break;
     }
     lua_pop(L, 1);
+    tcmapdel(tuple);
     if (!result) {
         _failure(L, tcrdberrmsg(tcrdbecode(db)));
     } else {
         lua_pushboolean(L, 1);
     }
-    tcmapdel(tuple);
 
     // ready
     return 1;

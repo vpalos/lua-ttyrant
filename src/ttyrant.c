@@ -311,6 +311,7 @@ static int _table_put(lua_State* L, const char* error, int kind) {
             result = tcrdbtblput(db, key, keysz, tuple);
             break;
     }
+    lua_pop(L, 1);
     if (!result) {
         _failure(L, tcrdberrmsg(tcrdbecode(db)));
     } else {
